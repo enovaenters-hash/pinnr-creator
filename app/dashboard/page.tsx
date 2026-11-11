@@ -4,28 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
-import { CATEGORIES, categoryColor, type Creator, type Video } from '@/lib/types';
+import { categoryColor, type Creator, type Video } from '@/lib/types';
+import { api } from '@/lib/api';
+import VideoEditForm from '@/components/VideoEditForm';
 import { NotConfigured } from '@/components/AuthCard';
 import type { MapPin } from '@/components/Map';
 
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
 type Filter = 'all' | 'needs' | 'mapped';
-
-async function api(path: string, init: RequestInit = {}) {
-  const { data } = await getSupabase().auth.getSession();
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${data.session?.access_token ?? ''}`,
-      ...(init.headers ?? {}),
-    },
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
-  return json;
-}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -158,7 +145,7 @@ export default function Dashboard() {
           <Stat label="Videos" value={videos.length} />
           <Stat label="On map" value={mapped.length} />
           <Stat label="Need location" value={videos.length - mapped.length} />
-          <Stat label="Featured" value={`${featuredCount}/3`} />
+          <Stat label="Top picks" value={`${featuredCount}/3`} />
         </section>
 
         {/* Map */}
@@ -209,7 +196,7 @@ export default function Dashboard() {
                             : `⏳ ${v.address} (placing on next sync)`}
                         </p>
                       </div>
-                      <button title={v.featured ? 'Unfeature' : 'Feature (top 3)'}
+                      <button title={v.featured ? 'Remove from top picks' : 'Add to top picks (max 3)'}
                         onClick={() => patch(v.id, { featured: !v.featured })}
                         className={`text-lg leading-none ${v.featured ? 'text-amber-400' : 'text-gray-300 hover:text-amber-400'}`}>★</button>
                     </div>
@@ -226,7 +213,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {editingId === v.id && (
-                  <EditForm video={v} onCancel={() => setEditingId(null)}
+                  <VideoEditForm video={v} onCancel={() => setEditingId(null)}
                     onSave={async (body) => { if (await patch(v.id, body)) setEditingId(null); }} />
                 )}
               </li>
@@ -244,54 +231,5 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       <div className="text-[11px] uppercase tracking-wide text-gray-500">{label}</div>
       <div className="text-2xl font-semibold mt-1">{value}</div>
     </div>
-  );
-}
-
-function EditForm({ video, onSave, onCancel }: {
-  video: Video;
-  onSave: (body: Partial<Video>) => Promise<void>;
-  onCancel: () => void;
-}) {
-  const [placeName, setPlaceName] = useState(video.place_name ?? '');
-  const [category, setCategory] = useState(video.category ?? '');
-  const [address, setAddress] = useState(video.address ?? '');
-  const [discount, setDiscount] = useState(video.discount_code ?? '');
-  const [hidden, setHidden] = useState(video.hidden);
-  const [saving, setSaving] = useState(false);
-  const field = 'w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
-
-  return (
-    <form className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        await onSave({ place_name: placeName, category: category || null, address, discount_code: discount, hidden });
-        setSaving(false);
-      }}>
-      <label className="text-xs text-gray-600">Place name
-        <input className={field} value={placeName} onChange={(e) => setPlaceName(e.target.value)} placeholder="Joe's Pizza" />
-      </label>
-      <label className="text-xs text-gray-600">Category
-        <select className={field} value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="">—</option>
-          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </label>
-      <label className="text-xs text-gray-600 sm:col-span-2">Address
-        <input className={field} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="7 Carmine St, New York, NY" />
-      </label>
-      <label className="text-xs text-gray-600">Discount code <span className="text-gray-400">(optional)</span>
-        <input className={field} value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="SAMS10" />
-      </label>
-      <label className="text-xs text-gray-600 flex items-center gap-2 sm:mt-5">
-        <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} /> Hide from my public map
-      </label>
-      <div className="sm:col-span-2 flex gap-2 justify-end">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-sm rounded-md border border-gray-200">Cancel</button>
-        <button disabled={saving} className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white font-medium disabled:bg-gray-400">
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-    </form>
   );
 }
