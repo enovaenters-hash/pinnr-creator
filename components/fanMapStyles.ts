@@ -46,6 +46,8 @@ export const FAN_CSS = `
   .pcard .cz{font-size:10px;font-weight:700;color:#fff;border-radius:5px;padding:1px 6px}
   .pcard .star{font-size:9.5px;font-weight:800;color:#9a7413;background:#fdf3dd;border-radius:5px;padding:1px 5px}
   #pubmap{flex:1;min-width:0;position:relative;overflow:hidden}
+  /* TEST 1: turn off Leaflet's tile blending (mix-blend-mode: plus-lighter) to see if it's what blanks the TikTok player */
+  #pub .leaflet-container img.leaflet-tile{mix-blend-mode:normal}
   .pubright{width:390px;min-width:390px;border-left:1px solid var(--line);display:flex;flex-direction:column;background:#0e0f12;position:relative;gap:0}
   .pubright .rv{flex:1;min-height:0;background:#000;display:flex;align-items:center;justify-content:center;position:relative}
   .pubright .rv iframe{width:100%;height:100%;border:0}
