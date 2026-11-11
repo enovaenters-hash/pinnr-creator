@@ -8,6 +8,7 @@ import { categoryColor, type Creator, type Video } from '@/lib/types';
 import { api } from '@/lib/api';
 import VideoEditForm from '@/components/VideoEditForm';
 import { NotConfigured } from '@/components/AuthCard';
+import SiteNav from '@/components/SiteNav';
 import type { MapPin } from '@/components/Map';
 
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
@@ -109,10 +110,12 @@ export default function Dashboard() {
     return <main className="max-w-xl mx-auto p-6"><NotConfigured /></main>;
   }
   if (loading) {
-    return <main className="flex-1 flex items-center justify-center text-sm text-gray-500">Loading…</main>;
+    return <><SiteNav active="creator" /><main className="flex-1 flex items-center justify-center text-sm text-gray-500">Loading…</main></>;
   }
 
   return (
+    <>
+    <SiteNav active="creator" />
     <main className="flex-1 bg-white text-gray-900">
       <div className="max-w-5xl mx-auto px-4 pb-16">
         {/* Header — V16 full-width stack */}
@@ -222,6 +225,7 @@ export default function Dashboard() {
         </section>
       </div>
     </main>
+    </>
   );
 }
 
