@@ -1,112 +1,38 @@
-# Pinnr Creator Dashboard
+# Pinnr — creator maps from TikTok (Phase 2)
 
-A lean MVP dashboard for TikTok creators to create maps from their videos.
+Creators sign up with email + their TikTok username, tap **Sync Videos**, and their
+latest TikToks land on a public map. Fans browse one creator (`/c/<username>`) or
+everyone (`/map`).
 
-## Features
+## Pages
+| Path | What it is |
+|---|---|
+| `/signup`, `/login` | Email/password auth (Supabase) |
+| `/dashboard` | Creator dashboard: sync, edit place name / category / address / discount code, star top 3, hide |
+| `/c/<username>` | Public map for one creator |
+| `/map` | Combined map of all creators |
 
-- 🔗 **Connect TikTok Username** - Enter your TikTok handle
-- 📹 **Auto-Fetch Videos** - Pulls your latest 20 videos
-- 📍 **Extract Addresses** - Auto-detects locations from descriptions or manual entry
-- 🗺️ **Personal Map** - Display your videos on an interactive map
-- 🌍 **Combined Map** - See all creators' locations in one view
-- 💾 **LocalStorage** - Data persists in the browser (MVP version)
+## How sync works
+`POST /api/sync` pulls the creator's latest 20 videos from the unofficial TikWM API,
+inserts only videos not already stored, refreshes cover images (TikTok image links
+expire), pulls the place + address out of the caption, and geocodes with OpenStreetMap
+(about 15 lookups per sync; the rest are placed on the next sync).
 
-## Getting Started
+The TikTok source lives in one function, `fetchLatestVideos` in `lib/tiktok.ts`, so it
+can be swapped for an official or paid API later.
 
-### Prerequisites
-- Node.js 18+
-- npm or yarn
+## Setup
+1. **Supabase** — in Vercel open the project → *Storage* / *Integrations* → add **Supabase**
+   and connect it to this project. That sets `NEXT_PUBLIC_SUPABASE_URL` and
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` automatically.
+2. **Database** — in Supabase open *SQL Editor* → paste `supabase/schema.sql` → *Run*.
+3. **(Optional) instant signup** — Supabase → *Authentication* → *Sign In / Providers* →
+   *Email* → turn off **Confirm email**.
+4. Redeploy on Vercel (any `git push` does this).
 
-### Installation
+Local dev: put the two env vars in `.env.local`, then `npm install && npm run dev`.
 
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Start the development server:
-```bash
-npm run dev
-```
-
-3. Open [http://localhost:3000](http://localhost:3000) in your browser
-
-The app will automatically redirect you to the dashboard.
-
-## How to Use
-
-### 1. Dashboard
-- Enter your TikTok username (e.g., `samspov_1`)
-- Click "Fetch Videos" to pull your latest 20 videos
-- Edit addresses if they weren't auto-detected
-- Click "Add to Map" for each video
-
-### 2. Personal Map
-- View your locations on an interactive Leaflet map
-- Click markers to see video details
-- Only shows your videos
-
-### 3. Combined Map
-- View all creators' videos in one map
-- See stats on total creators and locations
-- Browse all locations by creator
-
-## Tech Stack
-
-- **Frontend**: Next.js 16 + React + TypeScript
-- **Styling**: Tailwind CSS
-- **Mapping**: Leaflet.js + OpenStreetMap
-- **Geocoding**: Nominatim (free, open-source)
-- **Storage**: Browser localStorage (MVP)
-
-## Project Structure
-
-```
-app/
-├── dashboard/          # Creator dashboard page
-├── map/
-│   ├── personal/      # Creator's personal map
-│   └── combined/      # Combined map of all creators
-├── api/
-│   ├── fetch-videos/  # Fetch TikTok videos (mock data)
-│   └── geocode/       # Convert address to coordinates
-└── page.tsx           # Redirect to dashboard
-
-components/
-└── Map.tsx            # Leaflet map component
-
-lib/
-└── types.ts           # TypeScript interfaces
-```
-
-## Next Steps - Phase 2
-
-- Add Supabase for persistent storage
-- Real TikTok API integration
-- User authentication
-- Creator analytics
-
-## Deployment
-
-### Deploy to Vercel
-
-```bash
-# Build for production
-npm run build
-
-# Start production server
-npm start
-```
-
-Push to GitHub, then import into Vercel for one-click deployment.
-
-## Known Limitations (MVP)
-
-- Uses browser localStorage only (MVP)
-- Mock TikTok data (no real API yet)
-- No user authentication
-- No persistent backend database
-
-## License
-
-MIT
+## Known limits (MVP)
+- TikWM is unofficial and rate-limited (~1 request/second); it can break if TikTok changes.
+- Captions without an address need the creator to add one in **Edit**.
+- Covers for videos older than the latest 20 eventually stop loading (TikTok link expiry).
