@@ -1,17 +1,16 @@
 'use client';
 
-import Link from 'next/link';
 import { supabaseConfigured } from '@/lib/supabase';
+import SiteNav from '@/components/SiteNav';
 
 export function AuthCard({
   title, subtitle, children, footer,
 }: { title: string; subtitle: string; children: React.ReactNode; footer: React.ReactNode }) {
   return (
+    <>
+    <SiteNav active="creator" />
     <main className="flex-1 flex items-center justify-center px-4 py-12 bg-gray-50">
       <div className="w-full max-w-sm">
-        <Link href="/" className="block text-center text-lg font-bold tracking-tight text-gray-900 mb-6">
-          📍 Pinnr
-        </Link>
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
           <p className="text-sm text-gray-500 mt-1 mb-5">{subtitle}</p>
@@ -20,6 +19,7 @@ export function AuthCard({
         <p className="text-center text-sm text-gray-500 mt-4">{footer}</p>
       </div>
     </main>
+    </>
   );
 }
 
