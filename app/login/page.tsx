@@ -20,7 +20,8 @@ export default function LoginPage() {
     const { error } = await getSupabase().auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { setError(error.message); return; }
-    router.replace('/dashboard');
+    const next = new URLSearchParams(window.location.search).get('next');
+    router.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
   }
 
   return (
