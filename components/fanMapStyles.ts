@@ -66,6 +66,9 @@ export const FAN_CSS = `
   .rfail p{margin:0;font-size:13px;font-weight:650}
   .rfail .rbtn{flex:0 0 auto;padding:9px 16px}
   .rtry{background:none;border:0;color:#ddd;font-size:12px;font-weight:700;text-decoration:underline}
+  .rslow{position:absolute;left:10px;right:10px;bottom:10px;z-index:5;background:rgba(0,0,0,.82);color:#ddd;font-size:12px;font-weight:650;border-radius:10px;padding:9px 12px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:center}
+  .rslow a{color:#fff;font-weight:800;text-decoration:none;background:var(--accent);padding:5px 10px;border-radius:999px}
+  .rslow button{background:none;border:0;color:#fff;font-weight:750;font-size:12px;text-decoration:underline}
   .rmeta{background:rgba(0,0,0,.9);backdrop-filter:blur(4px);padding:13px 15px 15px;position:relative;flex:0 0 auto;max-height:65%;overflow-y:auto;transition:max-height .3s ease,padding .3s ease;border-top:1px solid rgba(255,255,255,.1)}
   .rmeta.collapsed{max-height:36px;padding:10px 15px;overflow:hidden;border-top:none}
   .rmeta h3{margin:0 0 4px;font-size:17px;font-weight:700;letter-spacing:-.2px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}

@@ -236,6 +236,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
               <a class="rbtn tt" target="_blank" rel="noopener" href="https://www.tiktok.com/@${encodeURIComponent(p.creator)}/video/${encodeURIComponent(v.id)}">▶ TikTok</a>
             </div>
           </div>`;
+        if (playMode) watchForSlowPlayer();
       }
 
       // ── Tap to play: show the cover first, load TikTok's player only when ▶ is tapped ──
@@ -257,11 +258,25 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
             <button class="rtry" data-act="retry">↻ Try again</button>
           </div></div>`;
       }
+      // If TikTok's player hasn't said it's ready after a while, offer a way out
+      // (it can sit black when TikTok is limiting embeds) without removing the player.
+      let slowTimer: ReturnType<typeof setTimeout> | null = null;
+      function watchForSlowPlayer() {
+        if (slowTimer) clearTimeout(slowTimer);
+        slowTimer = setTimeout(() => {
+          const stage = $('pubRight')?.querySelector('.rstage');
+          if (!stage || !stage.querySelector('iframe') || stage.querySelector('.rslow') || !curVid || !pubVidP) return;
+          stage.insertAdjacentHTML('beforeend', `<div class="rslow">Taking a while?
+            <a target="_blank" rel="noopener" href="https://www.tiktok.com/@${encodeURIComponent(pubVidP.creator)}/video/${encodeURIComponent(curVid.id)}">▶ Watch on TikTok</a>
+            <button data-act="retry">↻ Try again</button></div>`);
+        }, 8000);
+      }
       function startPlayer(bust = false) {
         if (!curVid) return;
         playMode = true;
         const stage = $('pubRight').querySelector('.rstage');
         if (stage) stage.innerHTML = playerHtml(curVid, bust);
+        watchForSlowPlayer();
       }
 
       // TikTok's player reports errors (server error, playback error, autoplay blocked) via postMessage.
@@ -272,7 +287,12 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         if (!d || !d['x-tiktok-player']) return;
         const frame = $('pubRight')?.querySelector('iframe');
         if (!frame || e.source !== frame.contentWindow) return;
+        if (d.type === 'onPlayerReady' || d.type === 'onStateChange') {
+          if (slowTimer) clearTimeout(slowTimer);
+          $('pubRight').querySelector('.rslow')?.remove();
+        }
         if (d.type === 'onPlayerError' && curVid && pubVidP) {
+          if (slowTimer) clearTimeout(slowTimer);
           const stage = $('pubRight').querySelector('.rstage');
           if (stage) stage.innerHTML = failHtml(curVid, pubVidP.creator);
         }
