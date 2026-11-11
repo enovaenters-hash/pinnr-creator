@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getRequestUser } from '@/lib/supabase';
-import { fetchLatestVideos, extractLocation, guessCategory, geocodeCandidates } from '@/lib/tiktok';
+import { fetchLatestVideos, extractLocation, guessCategory, geocodeCandidates, looksLikeSentence } from '@/lib/tiktok';
 import { geocode, sleep, type GeoResult } from '@/lib/geocode';
 
 export const maxDuration = 60;
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         posted_at: v.postedAt,
         place_name: loc?.placeName || null,
         address: loc?.address ?? null,
-        category: guessCategory(v.caption),
+        category: guessCategory(`${v.caption} ${loc?.placeName ?? ''}`),
       };
     });
     const { error } = await supabase
@@ -59,7 +59,32 @@ export async function POST(request: Request) {
   await Promise.all(latest.filter((v) => seen.has(v.tiktokId) && v.coverUrl).map((v) =>
     supabase.from('videos').update({ cover_url: v.coverUrl }).eq('id', seen.get(v.tiktokId)!)));
 
-  // 3) Geocode anything with an address that hasn't been tried yet.
+  // 3) Repair older auto-filled data with the current caption parser: sentence-y place
+  //    names, missing addresses and missing categories. Creator edits are left alone
+  //    (they don't look like sentences, and edited addresses already have a value).
+  const { data: all } = await supabase
+    .from('videos').select('id, caption, place_name, address, category, lat')
+    .eq('creator_id', creator.id);
+  let repaired = 0;
+  await Promise.all((all ?? []).map(async (v) => {
+    const fix: Record<string, unknown> = {};
+    const loc = extractLocation(v.caption ?? '');
+    if (looksLikeSentence(v.place_name)) fix.place_name = loc?.placeName ?? null;
+    if (!v.address && v.lat === null && loc) {
+      fix.address = loc.address;
+      if (!v.place_name && loc.placeName) fix.place_name = loc.placeName;
+    }
+    if (!v.category) {
+      const cat = guessCategory(`${v.caption ?? ''} ${(fix.place_name as string) ?? v.place_name ?? ''}`);
+      if (cat) fix.category = cat;
+    }
+    if (Object.keys(fix).length) {
+      repaired++;
+      await supabase.from('videos').update(fix).eq('id', v.id);
+    }
+  }));
+
+  // 4) Geocode anything with an address that hasn't been tried yet.
   const { data: pending } = await supabase
     .from('videos').select('id, address, place_name')
     .eq('creator_id', creator.id).is('lat', null).not('address', 'is', null).eq('geocode_attempted', false)
@@ -100,6 +125,7 @@ export async function POST(request: Request) {
     checked: latest.length,
     added: fresh.length,
     mapped,
+    repaired,
     pending: (pending?.length ?? 0) - processed, // still to locate on the next sync
   });
 }
