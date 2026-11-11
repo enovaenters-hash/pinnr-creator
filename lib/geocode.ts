@@ -14,7 +14,7 @@ export async function geocode(query: string): Promise<GeoResult | null> {
   url.searchParams.set('limit', '1');
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Pinnr/0.2 (creator maps)' },
+      headers: { 'User-Agent': 'POVGo/0.3 (creator maps)' },
       cache: 'no-store',
     });
     if (!res.ok) return null;
