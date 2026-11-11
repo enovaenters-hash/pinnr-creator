@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pinnr - Creator Dashboard",
-  description: "Create maps from your TikTok videos",
+  title: "Pinnr",
+  description: "Maps of the places creators post on TikTok",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
