@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { pinSvg } from '@/lib/brand';
 
 export interface MapPin {
   id: string;
@@ -48,19 +49,19 @@ export default function Map({ pins, focusId }: { pins: MapPin[]; focusId?: strin
     const markers = pins.map((p) => {
       const icon = L.divIcon({
         className: '',
-        html: `<span style="display:block;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${esc(p.color)};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)"></span>`,
-        iconSize: [18, 18],
-        iconAnchor: [9, 18],
-        popupAnchor: [0, -18],
+        html: pinSvg(28),
+        iconSize: [28, 28],
+        iconAnchor: [14, 27],
+        popupAnchor: [0, -26],
       });
       const cover = safeUrl(p.cover);
       const href = safeUrl(p.href);
       const html = `
-        <div style="width:200px;font-family:system-ui,sans-serif">
-          ${cover ? `<img src="${cover}" referrerpolicy="no-referrer" style="width:100%;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px" />` : ''}
-          <div style="font-weight:600;font-size:13px">${esc(p.title)}</div>
-          ${p.subtitle ? `<div style="font-size:11px;color:#666;margin-top:2px">${esc(p.subtitle)}</div>` : ''}
-          ${href ? `<a href="${href}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:12px;color:#2563eb">Watch on TikTok →</a>` : ''}
+        <div style="width:200px;font-family:var(--font-nunito),system-ui,sans-serif">
+          ${cover ? `<img src="${cover}" referrerpolicy="no-referrer" style="width:100%;height:110px;object-fit:cover;border-radius:12px;margin-bottom:6px" />` : ''}
+          <div style="font-family:var(--font-fredoka),sans-serif;font-weight:600;font-size:15px;color:#13293a">${esc(p.title)}</div>
+          ${p.subtitle ? `<div style="font-size:11px;color:#5f7a89;margin-top:2px">${esc(p.subtitle)}</div>` : ''}
+          ${href ? `<a href="${href}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:12px;font-weight:800;color:#1c7fb0">Watch on TikTok →</a>` : ''}
         </div>`;
       return { id: p.id, marker: L.marker([p.lat, p.lng], { icon }).bindPopup(html).addTo(layer.current!) };
     });

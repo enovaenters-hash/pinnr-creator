@@ -6,10 +6,12 @@ import type * as Leaflet from 'leaflet';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import { categoryColor } from '@/lib/types';
 import { FAN_CSS } from './fanMapStyles';
+import { pinSvg, ICE, SUN } from '@/lib/brand';
+import Logo from '@/components/Logo';
 
 /**
  * The fan map, matching the original layout (keen-lollipop-93bfb2.netlify.app):
- * pink creator bar · category chips · place list | map | TikTok player with clip navigation.
+ * ice-blue POVGo bar · category chips · place list | map | TikTok player with clip navigation.
  * Data comes live from Supabase; videos at the same address are grouped into one place.
  */
 
@@ -30,7 +32,9 @@ const cLabel = (c: string) => LABELS[c] ?? c.charAt(0).toUpperCase() + c.slice(1
 const cColor = (c: string) => categoryColor(c);
 const formatDate = (d: string) => { if (!d) return 'N/A'; const [y, m, day] = d.split('-'); return m && y ? `${m}/${day || '01'}/${y.slice(-2)}` : 'N/A'; };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-const ACCENTS = ['#ff2d55', '#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#db2777', '#65a30d'];
+// Creator dots in the All Spots view.
+const ACCENTS = ['#1c7fb0', '#f2a900', '#e8513b', '#7a5af8', '#13a877', '#d9468f', '#0e9fb5', '#6b8e23'];
+const HOME_PIN = pinSvg(22, '#ffffff', ICE, 'transparent');
 
 function cityOf(addr: string): string {
   const parts = addr.split(',').map((s) => s.trim()).filter(Boolean);
@@ -91,9 +95,10 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
       const want = (params.get('creator') ?? initialCreator ?? '').replace(/^@/, '').toLowerCase();
 
       const $ = (id: string) => document.getElementById(id) as HTMLElement;
+      (window as unknown as { __povgoPin: string }).__povgoPin = HOME_PIN;
       $('pubLoading')?.remove();
 
-      let ACCENT = '#ff2d55';
+      let ACCENT = SUN;
       let CUR: string | null = null; // creator handle, or null = all creators
       let combinedMode = true;
       let PUBSET: Place[] = [];
@@ -123,23 +128,33 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         const c = handle ? CREATORS.find((x) => x.handle === handle) : undefined;
         CUR = c ? c.handle : null;
         combinedMode = !CUR;
-        ACCENT = '#ff2d55';
+        ACCENT = SUN;
         $('pub').style.setProperty('--accent', ACCENT);
         PUBSET = CUR ? ALL.filter((p) => p.creator === CUR) : ALL;
         sel.value = CUR ?? '';
         const pfp = $('pubPfp');
-        pfp.innerHTML = c?.avatar ? `<img src="${esc(c.avatar)}" referrerpolicy="no-referrer" alt="" onerror="this.parentNode.textContent='📍'">` : '📍';
+        pfp.innerHTML = c?.avatar ? `<img src="${esc(c.avatar)}" referrerpolicy="no-referrer" alt="" onerror="this.parentNode.innerHTML=window.__povgoPin">` : HOME_PIN;
         $('pubName').textContent = c ? `${c.name}'s Spots` : 'All Spots';
         $('pubHandle').textContent = c ? `@${c.handle} · tap a pin to watch` : `${CREATORS.length} creator${CREATORS.length === 1 ? '' : 's'} · tap a pin to watch`;
         showPub();
       }
 
-      function pin(fill: string, ring: string, count: number) {
+      // POVGo Play Pin markers: ice blue, and sunny yellow for the place being watched.
+      function pin(count: number, selected = false) {
+        const size = selected ? 38 : 30;
         const badge = count > 1 ? `<span class="marker-badge">${count}</span>` : '';
         return L.divIcon({
-          className: '', iconSize: [22, 22], iconAnchor: [11, 22], popupAnchor: [0, -20],
-          html: `<div style="position:relative;width:22px;height:22px"><div class="marker-pin" style="background:${fill};box-shadow:0 0 0 3px ${ring},0 2px 4px rgba(0,0,0,.4)"></div>${badge}</div>`,
+          className: '', iconSize: [size, size], iconAnchor: [size / 2, size - 1], popupAnchor: [0, -size],
+          html: `<div style="position:relative;width:${size}px;height:${size}px">${pinSvg(size, selected ? SUN : ICE)}${badge}</div>`,
         });
+      }
+      let litMarker = -1;
+      function lightMarker(i: number) {
+        if (litMarker >= 0 && pubMarkers[litMarker]) {
+          pubMarkers[litMarker].setIcon(pin(PUBSET[litMarker].videos.length)).setZIndexOffset(0);
+        }
+        litMarker = i;
+        if (i >= 0 && pubMarkers[i]) pubMarkers[i].setIcon(pin(PUBSET[i].videos.length, true)).setZIndexOffset(1000);
       }
 
       function showPub() {
@@ -162,9 +177,9 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
           };
           chips.appendChild(el);
         });
-        pubMarkers.forEach((m) => pubmap!.removeLayer(m)); pubMarkers = [];
+        pubMarkers.forEach((m) => pubmap!.removeLayer(m)); pubMarkers = []; litMarker = -1;
         PUBSET.forEach((p, i) => {
-          const m = L.marker([p.lat, p.lon], { icon: pin(cColor(p.cuisine), combinedMode ? p.accent : ACCENT, p.videos.length) }).addTo(pubmap!);
+          const m = L.marker([p.lat, p.lon], { icon: pin(p.videos.length) }).addTo(pubmap!);
           m.on('click', () => selectPub(i)); pubMarkers[i] = m;
         });
         $('pubRight').innerHTML = PUBSET.length
@@ -177,6 +192,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
 
       function selectPub(i: number, dbId?: string) {
         pubSel = i; const p = PUBSET[i];
+        lightMarker(i);
         [...$('pubList').children].forEach((x) => x.classList.toggle('on', Number((x as HTMLElement).dataset.i) === i));
         $('pubList').querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
         pubVidP = p;
@@ -389,8 +405,10 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
       <style>{FAN_CSS}</style>
       <div id="pub">
         <div className="pubbar">
-          <a className="pfp" id="pubPfp" href="/" title="Pinnr home">📍</a>
-          <div><div className="nm" id="pubName">Pinnr</div><div className="h" id="pubHandle">Loading…</div></div>
+          <a className="publogo" href="/" aria-label="POVGo home"><Logo tone="onIce" className="h-[30px] w-auto" /></a>
+          <span className="pubdiv" aria-hidden="true" />
+          <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
+          <div className="pubwho"><div className="nm" id="pubName">All Spots</div><div className="h" id="pubHandle">Loading…</div></div>
           <nav className="pubnav" aria-label="Main">
             <a href="/">Home</a>
             <a href="/map" className="on" aria-current="page">Fan Map</a>

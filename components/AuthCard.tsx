@@ -9,10 +9,10 @@ export function AuthCard({
   return (
     <>
     <SiteNav active="creator" />
-    <main className="flex-1 flex items-center justify-center px-4 py-12 bg-gray-50">
+    <main className="flex-1 flex items-center justify-center px-4 py-12 bg-cloud">
       <div className="w-full max-w-sm">
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+        <div className="card p-7">
+          <h1 className="text-2xl font-semibold text-ink">{title}</h1>
           <p className="text-sm text-gray-500 mt-1 mb-5">{subtitle}</p>
           {supabaseConfigured ? children : <NotConfigured />}
         </div>
@@ -33,6 +33,6 @@ export function NotConfigured() {
 }
 
 export const inputClass =
-  'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500';
+  'w-full px-4 py-2.5 border-2 border-gray-200 rounded-full text-sm text-ink bg-white focus:outline-none focus:border-ice focus:ring-4 focus:ring-frost';
 export const primaryBtn =
-  'w-full py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400';
+  'btn-sun w-full py-3 text-sm';

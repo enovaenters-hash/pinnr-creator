@@ -45,7 +45,7 @@ export default function VideoEditForm({ video, onSave, onCancel }: {
       </label>
       <div className="sm:col-span-2 flex gap-2 justify-end">
         <button type="button" onClick={onCancel} className="px-3 py-1.5 text-sm rounded-md border border-gray-200">Cancel</button>
-        <button disabled={saving} className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white font-medium disabled:bg-gray-400">
+        <button disabled={saving} className="btn-sun px-4 py-1.5 text-sm">
           {saving ? 'Saving…' : 'Save'}
         </button>
       </div>

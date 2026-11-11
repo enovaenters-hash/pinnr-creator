@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import Logo from '@/components/Logo';
 
-type Active = 'home' | 'map' | 'creator';
+type Active = 'home' | 'map' | 'creator' | 'admin';
 
 const LINKS: { key: Active; href: string; label: string }[] = [
   { key: 'home', href: '/', label: 'Home' },
@@ -8,20 +9,19 @@ const LINKS: { key: Active; href: string; label: string }[] = [
   { key: 'creator', href: '/dashboard', label: 'Creator Login' },
 ];
 
-/** Pink top bar with the same Home / Fan Map / Creator Login buttons as the fan map. */
-export default function SiteNav({ active }: { active: Active }) {
+/** Ice-blue POVGo top bar with Home / Fan Map / Creator Login, shared by every page. */
+export default function SiteNav({ active }: { active?: Active }) {
   return (
-    <div className="bg-[#ff2d55] text-white">
+    <div className="bg-ice text-ink">
       <div className="max-w-5xl mx-auto px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Link href="/" className="flex items-center gap-2 font-bold">
-          <span className="w-8 h-8 rounded-full bg-white/25 flex items-center justify-center">📍</span>
-          Pinnr
+        <Link href="/" aria-label="POVGo home" className="shrink-0">
+          <Logo tone="onIce" className="h-9 w-auto" />
         </Link>
         <nav aria-label="Main" className="flex gap-1.5 ml-auto w-full sm:w-auto">
           {LINKS.map((l) => (
             <Link key={l.key} href={l.href} aria-current={active === l.key ? 'page' : undefined}
-              className={`flex-1 sm:flex-none text-center whitespace-nowrap text-xs font-bold px-3 py-1.5 rounded-full border ${
-                active === l.key ? 'bg-white/90 text-gray-900 border-transparent' : 'border-white/60 hover:bg-white/20'}`}>
+              className={`flex-1 sm:flex-none text-center whitespace-nowrap text-sm font-extrabold px-4 py-2 rounded-full transition-colors ${
+                active === l.key ? 'bg-white text-ink shadow-sm' : 'text-ink/80 hover:bg-white/40'}`}>
               {l.label}
             </Link>
           ))}
