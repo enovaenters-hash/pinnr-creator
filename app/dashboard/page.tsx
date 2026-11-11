@@ -116,25 +116,25 @@ export default function Dashboard() {
   return (
     <>
     <SiteNav active="creator" />
-    <main className="flex-1 bg-white text-gray-900">
+    <main className="flex-1 bg-cloud text-ink">
       <div className="max-w-5xl mx-auto px-4 pb-16">
         {/* Header — V16 full-width stack */}
-        <header className="py-6 border-b border-gray-200 mb-6">
+        <header className="card p-5 mt-6 mb-6">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-baseline gap-2 min-w-0">
-              <h1 className="text-base font-semibold truncate">{creator?.display_name || creator?.tiktok_username}</h1>
+              <h1 className="text-xl font-semibold truncate">{creator?.display_name || creator?.tiktok_username}</h1>
               <span className="text-sm text-gray-500 truncate">@{creator?.tiktok_username}</span>
             </div>
             <button onClick={signOut} className="text-xs text-gray-500 hover:text-gray-900">Sign out</button>
           </div>
           <button onClick={sync} disabled={syncing}
-            className="w-full py-2 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400">
+            className="btn-sun w-full py-3 text-sm">
             {syncing ? 'Syncing…' : 'Sync Videos'}
           </button>
           <div className="flex gap-2 mt-2">
-            <button onClick={share} className="flex-1 py-2 rounded-md border border-gray-200 text-sm font-medium hover:border-blue-500">Share</button>
+            <button onClick={share} className="btn-ghost flex-1 py-2 text-sm">Share</button>
             <a href={publicUrl} target="_blank" rel="noopener"
-              className="flex-1 py-2 rounded-md border border-gray-200 text-sm font-medium text-center hover:border-blue-500">View</a>
+              className="btn-ghost flex-1 py-2 text-sm text-center">View</a>
           </div>
           {status && (
             <p className={`mt-3 text-sm ${status.tone === 'err' ? 'text-red-600' : status.tone === 'ok' ? 'text-green-700' : 'text-gray-600'}`}>
@@ -153,7 +153,7 @@ export default function Dashboard() {
 
         {/* Map */}
         <section className="mb-8">
-          <div className="h-72 rounded-lg overflow-hidden border border-gray-200 relative z-0">
+          <div className="h-72 rounded-xl overflow-hidden border-2 border-white shadow-[0_6px_20px_rgba(19,41,58,.07)] relative z-0">
             <Map pins={pins} />
           </div>
           <p className="text-xs text-gray-500 mt-2">
@@ -164,11 +164,11 @@ export default function Dashboard() {
         {/* Videos */}
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold">Your videos</h2>
+            <h2 className="text-xl font-semibold">Your videos</h2>
             <div className="flex gap-1 text-xs">
               {(['all', 'needs', 'mapped'] as Filter[]).map((f) => (
                 <button key={f} onClick={() => setFilter(f)}
-                  className={`px-3 py-1 rounded-full border ${filter === f ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-600'}`}>
+                  className={`px-3 py-1 rounded-full border ${filter === f ? 'bg-ink text-white border-ink font-bold' : 'bg-white border-gray-200 text-gray-600 font-semibold'}`}>
                   {f === 'all' ? 'All' : f === 'needs' ? 'Needs location' : 'On map'}
                 </button>
               ))}
@@ -183,7 +183,7 @@ export default function Dashboard() {
 
           <ul className="space-y-3">
             {shown.map((v) => (
-              <li key={v.id} className="border border-gray-200 rounded-lg p-3">
+              <li key={v.id} className="card p-3">
                 <div className="flex gap-3">
                   {v.cover_url
                     ? <img src={v.cover_url} referrerPolicy="no-referrer" alt="" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} className="w-16 h-24 object-cover rounded-md bg-gray-100 shrink-0" />
@@ -231,9 +231,9 @@ export default function Dashboard() {
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-      <div className="text-[11px] uppercase tracking-wide text-gray-500">{label}</div>
-      <div className="text-2xl font-semibold mt-1">{value}</div>
+    <div className="card p-4">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="font-display text-3xl font-semibold mt-1">{value}</div>
     </div>
   );
 }
