@@ -95,3 +95,57 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_creator();
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Admin + Featured Locations
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- Who can use /admin. Add someone with:
+--   insert into public.admins (user_id)
+--   select id from public.creators where tiktok_username = 'their_handle';
+create table if not exists public.admins (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.admins enable row level security;
+
+drop policy if exists "admins read self" on public.admins;
+create policy "admins read self" on public.admins
+  for select using (user_id = auth.uid());
+
+create or replace function public.is_admin()
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select exists (select 1 from public.admins where user_id = auth.uid());
+$$;
+
+-- Admins can see hidden videos and edit any video.
+drop policy if exists "videos readable" on public.videos;
+create policy "videos readable" on public.videos
+  for select using (hidden = false or auth.uid() = creator_id or public.is_admin());
+
+drop policy if exists "videos admin update" on public.videos;
+create policy "videos admin update" on public.videos
+  for update using (public.is_admin()) with check (public.is_admin());
+
+-- Three admin-picked spots shown on the home screen.
+create table if not exists public.featured_locations (
+  slot       smallint primary key check (slot between 1 and 3),
+  video_id   uuid not null references public.videos(id) on delete cascade,
+  updated_at timestamptz not null default now()
+);
+alter table public.featured_locations enable row level security;
+
+drop policy if exists "featured public read" on public.featured_locations;
+create policy "featured public read" on public.featured_locations
+  for select using (true);
+
+drop policy if exists "featured admin write" on public.featured_locations;
+create policy "featured admin write" on public.featured_locations
+  for all using (public.is_admin()) with check (public.is_admin());
+
+-- Home screen "New POVs" query.
+create index if not exists videos_new_povs_idx on public.videos (created_at desc)
+  where hidden = false and lat is not null;
+create index if not exists creators_created_idx on public.creators (created_at desc);
