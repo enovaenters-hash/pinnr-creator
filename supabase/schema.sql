@@ -149,3 +149,21 @@ create policy "featured admin write" on public.featured_locations
 create index if not exists videos_new_povs_idx on public.videos (created_at desc)
   where hidden = false and lat is not null;
 create index if not exists creators_created_idx on public.creators (created_at desc);
+
+-- Admin: permanently delete a creator (login → profile → videos → featured slots cascade).
+create or replace function public.admin_delete_creator(target uuid)
+returns void
+language plpgsql security definer set search_path = public, auth
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can delete creators.';
+  end if;
+  if target = auth.uid() then
+    raise exception 'You can''t delete your own account from the admin page.';
+  end if;
+  delete from auth.users where id = target;
+end;
+$$;
+revoke all on function public.admin_delete_creator(uuid) from public, anon;
+grant execute on function public.admin_delete_creator(uuid) to authenticated;
