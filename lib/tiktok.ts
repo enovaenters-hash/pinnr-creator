@@ -8,33 +8,59 @@ export interface RawTikTokVideo {
   postedAt: string | null;
 }
 
+const BROWSER_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+  Accept: 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  Referer: 'https://www.tikwm.com/',
+};
+
+type TikwmResponse = { code?: number; msg?: string; data?: { videos?: Array<Record<string, unknown>> } };
+
 /**
- * Fetch a creator's latest public videos.
- *
- * Uses the unofficial TikWM API (no key, ~1 request/second limit). This is the MVP
- * data source and may break if TikTok or TikWM change; swap this one function for an
- * official/paid provider later without touching the rest of the app.
+ * Get the raw post list. Two unofficial sources, same response format:
+ *  - TIKTOK_RAPIDAPI_KEY set → TikWM's RapidAPI listing ("TikTok Scraper", tiktok-scraper7),
+ *    which works from servers.
+ *  - otherwise → the free public TikWM endpoint (may block cloud servers with 403).
+ */
+async function fetchPosts(handle: string, count: number): Promise<TikwmResponse> {
+  const params = new URLSearchParams({ unique_id: handle, count: String(count), cursor: '0' });
+  const rapidKey = process.env.TIKTOK_RAPIDAPI_KEY;
+
+  if (rapidKey) {
+    const host = process.env.TIKTOK_RAPIDAPI_HOST || 'tiktok-scraper7.p.rapidapi.com';
+    const res = await fetch(`https://${host}/user/posts?${params}`, {
+      headers: { 'x-rapidapi-key': rapidKey, 'x-rapidapi-host': host },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`TikTok lookup failed (RapidAPI HTTP ${res.status})`);
+    return res.json();
+  }
+
+  let res = await fetch('https://www.tikwm.com/api/user/posts', {
+    method: 'POST',
+    headers: { ...BROWSER_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params,
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    res = await fetch(`https://www.tikwm.com/api/user/posts?${params}`, { headers: BROWSER_HEADERS, cache: 'no-store' });
+  }
+  if (res.status === 403) {
+    throw new Error('TikTok lookup blocked (HTTP 403). The free source blocks our server — add TIKTOK_RAPIDAPI_KEY in Vercel.');
+  }
+  if (!res.ok) throw new Error(`TikTok lookup failed (HTTP ${res.status})`);
+  return res.json();
+}
+
+/**
+ * Fetch a creator's latest public videos. This is the only function that knows where
+ * TikTok data comes from — swap it for an official/paid provider later.
  */
 export async function fetchLatestVideos(username: string, count = 20): Promise<RawTikTokVideo[]> {
   const handle = username.replace(/^@/, '').trim().toLowerCase();
-  const body = new URLSearchParams({ unique_id: handle, count: String(count), cursor: '0' });
-
-  const res = await fetch('https://www.tikwm.com/api/user/posts', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Mozilla/5.0 (compatible; Pinnr/0.2)',
-    },
-    body,
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`TikTok lookup failed (HTTP ${res.status})`);
-
-  const json = (await res.json()) as {
-    code?: number;
-    msg?: string;
-    data?: { videos?: Array<Record<string, unknown>> };
-  };
+  const json = await fetchPosts(handle, count);
   if (json.code !== 0) {
     throw new Error(json.msg ? `TikTok lookup failed: ${json.msg}` : 'TikTok lookup failed');
   }
