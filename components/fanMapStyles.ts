@@ -53,8 +53,19 @@ export const FAN_CSS = `
   .pubright .rv iframe{width:100%;height:100%;border:0}
   .pubright .empty{flex:1;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;color:#8b909b;font-size:13px;text-align:center;padding:26px;line-height:1.5}
   .pubright .empty .big{font-size:30px}
-  .rretry{background:#0e0f12;color:#8b909b;font-size:11.5px;padding:7px 15px;border-top:1px solid rgba(255,255,255,.08);flex:0 0 auto}
-  .rretry button{background:none;border:0;color:#fff;font-weight:750;font-size:11.5px;padding:0 2px;text-decoration:underline}
+  .rstage{position:absolute;inset:0}
+  .rstage iframe{width:100%;height:100%;border:0;display:block}
+  .rposter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#15161a;cursor:pointer;overflow:hidden}
+  .rposter .rcover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .rposter::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.45))}
+  .rplay{position:relative;z-index:1;width:74px;height:74px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:28px;padding-left:6px;box-shadow:0 6px 24px rgba(0,0,0,.45);transition:transform .15s}
+  .rposter:hover .rplay{transform:scale(1.07)}
+  .rhint{position:relative;z-index:1;color:#fff;font-size:12px;font-weight:750;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+  .rfailed{cursor:default}
+  .rfail{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:10px;background:rgba(0,0,0,.72);padding:16px 18px;border-radius:12px;color:#fff;text-align:center;max-width:80%}
+  .rfail p{margin:0;font-size:13px;font-weight:650}
+  .rfail .rbtn{flex:0 0 auto;padding:9px 16px}
+  .rtry{background:none;border:0;color:#ddd;font-size:12px;font-weight:700;text-decoration:underline}
   .rmeta{background:rgba(0,0,0,.9);backdrop-filter:blur(4px);padding:13px 15px 15px;position:relative;flex:0 0 auto;max-height:65%;overflow-y:auto;transition:max-height .3s ease,padding .3s ease;border-top:1px solid rgba(255,255,255,.1)}
   .rmeta.collapsed{max-height:36px;padding:10px 15px;overflow:hidden;border-top:none}
   .rmeta h3{margin:0 0 4px;font-size:17px;font-weight:700;letter-spacing:-.2px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}

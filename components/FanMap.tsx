@@ -15,10 +15,10 @@ import { FAN_CSS } from './fanMapStyles';
 
 type Row = {
   id: string; tiktok_id: string; posted_at: string | null; place_name: string | null; category: string | null;
-  address: string | null; lat: number; lng: number; discount_code: string | null; featured: boolean;
+  address: string | null; lat: number; lng: number; discount_code: string | null; featured: boolean; cover_url: string | null;
   creator_id: string; creators: { tiktok_username: string; display_name: string | null; avatar_url: string | null } | null;
 };
-type Vid = { id: string; date: string; dbId: string; code: string | null };
+type Vid = { id: string; date: string; dbId: string; code: string | null; cover: string | null };
 type Place = {
   name: string; cuisine: string; city: string; addr: string; lat: number; lon: number;
   videos: Vid[]; creator: string; creatorName: string; accent: string; featured: boolean; newest: string;
@@ -51,7 +51,7 @@ function groupPlaces(rows: Row[]): { places: Place[]; creators: CreatorInfo[] } 
     };
     const addrKey = (r.address ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') || `${r.lat.toFixed(4)},${r.lng.toFixed(4)}`;
     const key = `${handle}|${addrKey}`;
-    const vid: Vid = { id: r.tiktok_id, date: (r.posted_at ?? '').slice(0, 10), dbId: r.id, code: r.discount_code };
+    const vid: Vid = { id: r.tiktok_id, date: (r.posted_at ?? '').slice(0, 10), dbId: r.id, code: r.discount_code, cover: r.cover_url };
     if (!byKey[key]) {
       creatorMap[handle].count++;
       byKey[key] = {
@@ -75,11 +75,12 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
     if (!supabaseConfigured) return;
     let disposed = false;
     let pubmap: Leaflet.Map | null = null;
+    let onPlayerMessage: ((e: MessageEvent) => void) | null = null;
 
     (async () => {
       const L = (await import('leaflet')).default;
       const { data } = await getSupabase().from('videos')
-        .select('id, tiktok_id, posted_at, place_name, category, address, lat, lng, discount_code, featured, creator_id, creators(tiktok_username, display_name, avatar_url)')
+        .select('id, tiktok_id, posted_at, place_name, category, address, lat, lng, discount_code, featured, cover_url, creator_id, creators(tiktok_username, display_name, avatar_url)')
         .eq('hidden', false).not('lat', 'is', null)
         .order('posted_at', { ascending: false }).limit(5000);
       if (disposed) return;
@@ -102,6 +103,8 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
       const metaCollapsedState: Record<string, boolean> = {};
       let lastMetaCollapsed = false;
       let allCreatorVids: Vid[] = [], allCreatorLocations: Place[] = [], pubVidP: Place | null = null;
+      let curVid: Vid | null = null;
+      let playMode = false; // true once ▶ is tapped; ▲/▼ and date buttons then load the next video directly
 
       // ── Creator selector in the bar ──
       const sel = $('pubCreator') as HTMLSelectElement;
@@ -180,6 +183,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         buildCreatorVideoList(p.creator);
         let g = allCreatorLocations.findIndex((loc) => loc === p);
         if (dbId) { const k = allCreatorVids.findIndex((v) => v.dbId === dbId); if (k >= 0) g = k; }
+        playMode = false; // a new place starts on its cover; tap ▶ to load TikTok's player
         renderPubVideo(g);
         $('pubRight').classList.add('show');
         pubmap?.flyTo([p.lat, p.lon], 14, { duration: 0.5 });
@@ -199,6 +203,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         const v = allCreatorVids[gIdx];
         const p = allCreatorLocations[gIdx];
         pubVidP = p;
+        curVid = v;
         pubmap?.flyTo([p.lat, p.lon], 14, { duration: 0.5 });
         const nextIdx = (gIdx + 1) % total, prevIdx = (gIdx - 1 + total) % total;
         const clipnav = total > 1 ? `<div class="clipnav">
@@ -219,8 +224,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         const right = $('pubRight');
         right.dataset.loc = locationId;
         right.innerHTML = `
-          <div class="rv"><iframe src="${playerSrc(v.id)}" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe><button class="mback" data-act="back">← Back to Map</button>${clipnav}</div>
-          <div class="rretry">Video not showing? <button data-act="reload">↻ Reload video</button> or watch it on TikTok below.</div>
+          <div class="rv"><div class="rstage">${playMode ? playerHtml(v) : posterHtml(v)}</div><button class="mback" data-act="back">← Back to Map</button>${clipnav}</div>
           <div class="rmeta ${collapsed ? 'collapsed' : ''}">
             <h3 data-act="toggle"><span>${esc(p.name)}</span><span class="tag-in-header" style="background:${cColor(p.cuisine)}">#${esc(p.cuisine)}</span><span class="toggle-arrow">▼</span></h3>
             ${combinedMode ? `<div class="rby"><span class="d" style="background:${p.accent}"></span>@${esc(p.creator)} · ${esc(p.creatorName)}</div>` : ''}
@@ -234,10 +238,46 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
           </div>`;
       }
 
-      /** TikTok's embedded player sometimes stays black or errors; reloading it usually fixes that. */
+      // ── Tap to play: show the cover first, load TikTok's player only when ▶ is tapped ──
       function playerSrc(id: string, bust = false) {
         return `https://www.tiktok.com/player/v1/${encodeURIComponent(id)}?autoplay=1&description=1&music_info=0${bust ? `&r=${Date.now()}` : ''}`;
       }
+      const coverImg = (v: Vid) =>
+        v.cover ? `<img class="rcover" src="${esc(v.cover)}" referrerpolicy="no-referrer" alt="" onerror="this.remove()">` : '';
+      function posterHtml(v: Vid) {
+        return `<div class="rposter" data-act="play">${coverImg(v)}<button class="rplay" data-act="play" aria-label="Play video">▶</button><span class="rhint">Tap to play</span></div>`;
+      }
+      function playerHtml(v: Vid, bust = false) {
+        return `<iframe src="${playerSrc(v.id, bust)}" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe>`;
+      }
+      function failHtml(v: Vid, creator: string) {
+        return `<div class="rposter rfailed">${coverImg(v)}<div class="rfail">
+            <p>This video won't play here right now.</p>
+            <a class="rbtn tt" target="_blank" rel="noopener" href="https://www.tiktok.com/@${encodeURIComponent(creator)}/video/${encodeURIComponent(v.id)}">▶ Watch on TikTok</a>
+            <button class="rtry" data-act="retry">↻ Try again</button>
+          </div></div>`;
+      }
+      function startPlayer(bust = false) {
+        if (!curVid) return;
+        playMode = true;
+        const stage = $('pubRight').querySelector('.rstage');
+        if (stage) stage.innerHTML = playerHtml(curVid, bust);
+      }
+
+      // TikTok's player reports errors (server error, playback error, autoplay blocked) via postMessage.
+      onPlayerMessage = (e: MessageEvent) => {
+        if (e.origin !== 'https://www.tiktok.com') return;
+        let d = e.data;
+        if (typeof d === 'string') { try { d = JSON.parse(d); } catch { return; } }
+        if (!d || !d['x-tiktok-player']) return;
+        const frame = $('pubRight')?.querySelector('iframe');
+        if (!frame || e.source !== frame.contentWindow) return;
+        if (d.type === 'onPlayerError' && curVid && pubVidP) {
+          const stage = $('pubRight').querySelector('.rstage');
+          if (stage) stage.innerHTML = failHtml(curVid, pubVidP.creator);
+        }
+      };
+      window.addEventListener('message', onPlayerMessage);
 
       // Clicks inside the player panel (clip nav, date buttons, back, collapse, reload).
       $('pubRight').onclick = (e) => {
@@ -248,17 +288,8 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
           if (pubVidP) pubmap?.flyTo([pubVidP.lat, pubVidP.lon], 14, { duration: 0.5 });
           $('pubRight').classList.remove('show');
         }
-        if (t.dataset.act === 'reload') {
-          const old = $('pubRight').querySelector('iframe');
-          const id = old?.src.match(/player\/v1\/(\d+)/)?.[1];
-          if (old && id) {
-            const fresh = document.createElement('iframe');
-            fresh.allow = 'autoplay;encrypted-media;fullscreen';
-            fresh.allowFullscreen = true;
-            fresh.src = playerSrc(id, true);
-            old.replaceWith(fresh);
-          }
-        }
+        if (t.dataset.act === 'play') startPlayer();
+        if (t.dataset.act === 'retry') startPlayer(true);
         if (t.dataset.act === 'toggle') {
           const id = $('pubRight').dataset.loc ?? '';
           metaCollapsedState[id] = !(metaCollapsedState[id] ?? lastMetaCollapsed);
@@ -324,7 +355,11 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
       if (focusPlace) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
     })();
 
-    return () => { disposed = true; pubmap?.remove(); pubmap = null; };
+    return () => {
+      disposed = true;
+      if (onPlayerMessage) window.removeEventListener('message', onPlayerMessage);
+      pubmap?.remove(); pubmap = null;
+    };
   }, [initialCreator]);
 
   if (!supabaseConfigured) return <p className="p-6 text-sm">Supabase isn&apos;t connected yet.</p>;
