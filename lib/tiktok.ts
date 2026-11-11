@@ -6,6 +6,8 @@ export interface RawTikTokVideo {
   coverUrl: string | null;
   videoUrl: string;
   postedAt: string | null;
+  authorNickname: string | null;
+  authorAvatar: string | null;
 }
 
 const BROWSER_HEADERS = {
@@ -68,12 +70,15 @@ export async function fetchLatestVideos(username: string, count = 20): Promise<R
   return (json.data?.videos ?? []).map((v) => {
     const id = String(v.video_id ?? v.aweme_id ?? v.id ?? '');
     const created = Number(v.create_time);
+    const author = (v.author ?? {}) as { nickname?: string; avatar?: string };
     return {
       tiktokId: id,
       caption: String(v.title ?? ''),
       coverUrl: (v.origin_cover as string) || (v.cover as string) || null,
       videoUrl: `https://www.tiktok.com/@${handle}/video/${id}`,
       postedAt: Number.isFinite(created) && created > 0 ? new Date(created * 1000).toISOString() : null,
+      authorNickname: author.nickname || null,
+      authorAvatar: author.avatar || null,
     };
   }).filter((v) => v.tiktokId);
 }
