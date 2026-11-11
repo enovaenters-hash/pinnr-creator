@@ -21,7 +21,8 @@ const esc = (s: string) =>
 
 const safeUrl = (u?: string | null) => (u && /^https:\/\//i.test(u) ? esc(u) : null);
 
-export default function Map({ pins }: { pins: MapPin[] }) {
+/** focusId: zoom to that pin and open its popup (e.g. from a home-screen card). */
+export default function Map({ pins, focusId }: { pins: MapPin[]; focusId?: string | null }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -61,13 +62,17 @@ export default function Map({ pins }: { pins: MapPin[] }) {
           ${p.subtitle ? `<div style="font-size:11px;color:#666;margin-top:2px">${esc(p.subtitle)}</div>` : ''}
           ${href ? `<a href="${href}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:12px;color:#2563eb">Watch on TikTok →</a>` : ''}
         </div>`;
-      return L.marker([p.lat, p.lng], { icon }).bindPopup(html).addTo(layer.current!);
+      return { id: p.id, marker: L.marker([p.lat, p.lng], { icon }).bindPopup(html).addTo(layer.current!) };
     });
-    if (markers.length) {
-      const bounds = L.featureGroup(markers).getBounds();
+    const focused = focusId ? markers.find((m) => m.id === focusId) : undefined;
+    if (focused) {
+      map.current.setView(focused.marker.getLatLng(), 15);
+      focused.marker.openPopup();
+    } else if (markers.length) {
+      const bounds = L.featureGroup(markers.map((m) => m.marker)).getBounds();
       map.current.fitBounds(bounds.pad(0.2), { maxZoom: 14 });
     }
-  }, [pins]);
+  }, [pins, focusId]);
 
   return <div ref={el} className="w-full h-full" style={{ minHeight: 280 }} />;
 }
