@@ -25,8 +25,13 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   const { user, supabase } = auth;
   const { id } = await ctx.params;
 
-  const { data: current } = await supabase
-    .from('videos').select('*').eq('id', id).eq('creator_id', user.id).single();
+  // Admins can edit any video; creators only their own.
+  const { data: adminRow } = await supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle();
+  const isAdmin = Boolean(adminRow);
+
+  let lookup = supabase.from('videos').select('*').eq('id', id);
+  if (!isAdmin) lookup = lookup.eq('creator_id', user.id);
+  const { data: current } = await lookup.single();
   if (!current) return NextResponse.json({ error: 'Video not found.' }, { status: 404 });
 
   const body = (await request.json()) as Patch;
@@ -70,10 +75,10 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     if (want && !current.featured) {
       const { count } = await supabase
         .from('videos').select('id', { count: 'exact', head: true })
-        .eq('creator_id', user.id).eq('featured', true);
+        .eq('creator_id', current.creator_id).eq('featured', true);
       if ((count ?? 0) >= MAX_FEATURED) {
         return NextResponse.json(
-          { error: `You can feature up to ${MAX_FEATURED} videos. Unstar one first.` },
+          { error: `Only ${MAX_FEATURED} top picks allowed. Unstar one first.` },
           { status: 400 },
         );
       }
@@ -82,7 +87,7 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   }
 
   const { data, error } = await supabase
-    .from('videos').update(update).eq('id', id).eq('creator_id', user.id).select('*').single();
+    .from('videos').update(update).eq('id', id).eq('creator_id', current.creator_id).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ video: data, warning });
