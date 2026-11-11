@@ -319,7 +319,11 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         <div className="pubbar">
           <a className="pfp" id="pubPfp" href="/" title="Pinnr home">📍</a>
           <div><div className="nm" id="pubName">Pinnr</div><div className="h" id="pubHandle">Loading…</div></div>
-          <span className="pubtag">Fan Map</span>
+          <nav className="pubnav" aria-label="Main">
+            <a href="/">Home</a>
+            <a href="/map" className="on" aria-current="page">Fan Map</a>
+            <a href="/dashboard">Creator Login</a>
+          </nav>
           <select className="pubsel" id="pubCreator" aria-label="Choose creator"><option>All creators</option></select>
         </div>
         <div className="pubchips-wrapper">

@@ -12,7 +12,11 @@ export const FAN_CSS = `
   .pubbar .pfp img{width:100%;height:100%;object-fit:cover}
   .pubbar .nm{font-weight:750;line-height:1.25}.pubbar .h{font-size:12px;opacity:.9}
   .pubbar .pubtag{background:rgba(255,255,255,.92);color:#12141a;font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px}
-  .pubbar .pubsel{margin-left:auto;background:rgba(255,255,255,.92);color:#12141a;border:0;border-radius:999px;font-size:12px;font-weight:750;padding:6px 10px;max-width:46vw;outline:none;cursor:pointer}
+  .pubnav{display:flex;gap:6px;margin-left:auto}
+  .pubnav a{color:#fff;text-decoration:none;font-size:12px;font-weight:750;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.55);white-space:nowrap}
+  .pubnav a:hover{background:rgba(255,255,255,.18)}
+  .pubnav a.on{background:rgba(255,255,255,.92);color:#12141a;border-color:transparent}
+  .pubbar .pubsel{background:rgba(255,255,255,.92);color:#12141a;border:0;border-radius:999px;font-size:12px;font-weight:750;padding:6px 10px;max-width:46vw;outline:none;cursor:pointer}
   .pubmain{flex:1;display:flex;min-height:0;position:relative}
   .publeft{width:280px;min-width:280px;border-right:1px solid var(--line);display:flex;flex-direction:column;background:#fff;z-index:100}
   .publeft .srch{padding:12px 14px 9px;display:flex;gap:6px;align-items:center}
@@ -80,7 +84,10 @@ export const FAN_CSS = `
   .pubload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;background:#fff;z-index:700}
 
   @media(max-width:760px){
-    .pubbar .pubtag{display:none}
+    .pubbar{flex-wrap:wrap;row-gap:8px;padding:10px 14px}
+    .pubbar .pubsel{margin-left:auto}
+    .pubnav{order:3;width:100%;margin-left:0}
+    .pubnav a{flex:1;text-align:center;padding:6px 8px}
     .pubmain{display:block;position:relative}
     #pubmap{position:absolute;top:0;left:0;right:0;bottom:0}
     .publeft{position:absolute;left:0;right:0;bottom:0;width:auto;min-width:0;height:64%;border-right:0;
