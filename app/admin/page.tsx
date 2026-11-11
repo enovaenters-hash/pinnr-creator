@@ -20,6 +20,7 @@ export default function AdminPage() {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [slots, setSlots] = useState<Record<number, string>>({});
   const [msg, setMsg] = useState<{ text: string; err?: boolean } | null>(null);
+  const [me, setMe] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = getSupabase();
@@ -27,6 +28,7 @@ export default function AdminPage() {
     if (!session) { setStatus('signedOut'); return; }
     const { data: admin } = await supabase.from('admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
     if (!admin) { setStatus('denied'); return; }
+    setMe(session.user.id);
     const [v, c, f] = await Promise.all([
       supabase.from('videos').select('*, creators(tiktok_username, display_name, avatar_url)')
         .order('created_at', { ascending: false }).order('posted_at', { ascending: false }).limit(5000),
@@ -75,6 +77,18 @@ export default function AdminPage() {
     }
   }
 
+  /** Permanently remove a creator: their login, profile, videos and any Featured Location of theirs. */
+  async function deleteCreator(c: Creator) {
+    const { error } = await getSupabase().rpc('admin_delete_creator', { target: c.id });
+    if (error) { setMsg({ text: error.message, err: true }); return false; }
+    const gone = new Set(videos.filter((v) => v.creator_id === c.id).map((v) => v.id));
+    setCreators((cs) => cs.filter((x) => x.id !== c.id));
+    setVideos((vs) => vs.filter((v) => v.creator_id !== c.id));
+    setSlots((sl) => Object.fromEntries(Object.entries(sl).filter(([, id]) => !gone.has(id))));
+    setMsg({ text: `@${c.tiktok_username} and their ${gone.size} video${gone.size === 1 ? '' : 's'} were deleted.` });
+    return true;
+  }
+
   if (!supabaseConfigured) return <main className="max-w-xl mx-auto p-6"><NotConfigured /></main>;
   if (status === 'loading') return <Center>Loading…</Center>;
   if (status === 'signedOut') return <Center><Link href="/login?next=/admin" className="text-blue-600 font-medium">Sign in</Link> to use the admin page.</Center>;
@@ -107,7 +121,7 @@ export default function AdminPage() {
 
         {tab === 'featured' && <FeaturedTab videos={videos} slots={slots} onSet={setSlot} />}
         {tab === 'locations' && <LocationsTab videos={videos} creators={creators} onSave={saveVideo} />}
-        {tab === 'creators' && <CreatorsTab creators={creators} videos={videos} />}
+        {tab === 'creators' && <CreatorsTab creators={creators} videos={videos} me={me} onDelete={deleteCreator} />}
       </div>
     </main>
   );
@@ -227,7 +241,12 @@ function LocationsTab({ videos, creators, onSave }: {
 
 // ─── Creators ───────────────────────────────────────────────────────────────────
 
-function CreatorsTab({ creators, videos }: { creators: Creator[]; videos: PublicVideo[] }) {
+function CreatorsTab({ creators, videos, me, onDelete }: {
+  creators: Creator[]; videos: PublicVideo[]; me: string | null; onDelete: (c: Creator) => Promise<boolean>;
+}) {
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
   const stats = useMemo(() => {
     const s: Record<string, { total: number; mapped: number }> = {};
     videos.forEach((v) => {
@@ -255,7 +274,29 @@ function CreatorsTab({ creators, videos }: { creators: Creator[]; videos: Public
           <div className="flex gap-2 text-xs">
             <Link href={`/map?creator=${c.tiktok_username}`} className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">Map</Link>
             <a href={`https://www.tiktok.com/@${c.tiktok_username}`} target="_blank" rel="noopener" className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">TikTok ↗</a>
+            {c.id !== me && (
+              <button onClick={() => { setConfirming(confirming === c.id ? null : c.id); setTyped(''); }}
+                className="px-3 py-1.5 rounded-full border border-red-200 text-red-600 hover:bg-red-50">Delete</button>
+            )}
           </div>
+          {confirming === c.id && (
+            <div className="w-full mt-1 p-3 rounded-lg bg-red-50 border border-red-200 text-sm">
+              <p className="text-red-800">
+                This permanently deletes <strong>@{c.tiktok_username}</strong>: their login, profile and all {stats[c.id]?.total ?? 0} videos.
+                It can&apos;t be undone. Type <strong>{c.tiktok_username}</strong> to confirm.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={c.tiktok_username}
+                  className="flex-1 min-w-0 px-2 py-1.5 border border-red-300 rounded-md text-sm bg-white" autoCapitalize="none" />
+                <button disabled={busy || typed.trim().replace(/^@/, '').toLowerCase() !== c.tiktok_username}
+                  onClick={async () => { setBusy(true); if (await onDelete(c)) setConfirming(null); setBusy(false); }}
+                  className="px-3 py-1.5 rounded-md bg-red-600 text-white font-medium disabled:bg-red-300">
+                  {busy ? 'Deleting…' : 'Delete forever'}
+                </button>
+                <button onClick={() => setConfirming(null)} className="px-3 py-1.5 rounded-md border border-gray-300 bg-white">Cancel</button>
+              </div>
+            </div>
+          )}
         </li>
       ))}
       {creators.length === 0 && <li className="p-4 text-sm text-gray-500">No creators yet.</li>}
