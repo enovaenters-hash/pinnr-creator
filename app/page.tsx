@@ -6,6 +6,7 @@ import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import type { Creator } from '@/lib/types';
 import type { PublicVideo } from '@/components/PublicMap';
 import SpotCard from '@/components/SpotCard';
+import SiteNav from '@/components/SiteNav';
 
 type NewCreator = Creator & { spots: number };
 
@@ -45,19 +46,20 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="flex-1 bg-white text-gray-900">
+    <>
+    <SiteNav active="home" />
+    <main className="flex-1 bg-cloud text-ink">
       <div className="max-w-5xl mx-auto px-4 pb-16">
         {/* Hero + view chooser */}
-        <header className="pt-10 pb-8 text-center">
-          <h1 className="text-3xl font-bold tracking-tight">📍 Pinnr</h1>
-          <p className="text-gray-500 mt-2">Every spot your favorite creators post about, on one map.</p>
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
-            <Link href="/map" className="py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700">
-              Explore the map
-            </Link>
-            <Link href="/dashboard" className="py-3 rounded-lg border border-gray-300 font-semibold hover:border-gray-500">
-              I&apos;m a creator
-            </Link>
+        <header className="pt-12 pb-6">
+          <p className="text-sm font-bold text-gray-500">Spots from creators you watch</p>
+          <h1 className="font-display text-5xl sm:text-6xl font-bold tracking-tight leading-[1.02] mt-2">
+            See the POV.<br /><span className="text-glacier">Then go.</span>
+          </h1>
+          <p className="text-gray-600 mt-4 max-w-md">Every spot your favorite creators post about, on one map. Tap a pin, watch the video, get directions.</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/map" className="btn-sun px-6 py-3">Explore the map</Link>
+            <Link href="/dashboard" className="btn-ghost px-6 py-3">I&apos;m a creator</Link>
           </div>
         </header>
 
@@ -70,14 +72,14 @@ export default function Home() {
         </Section>
 
         <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">New Creators</h2>
+          <h2 className="text-2xl font-semibold mb-3">New Creators</h2>
           {newCreators === null && <Skeleton rows />}
           {newCreators?.length === 0 && <p className="text-sm text-gray-500">No creators yet.</p>}
           <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {newCreators?.map((c) => (
               <li key={c.id}>
                 <Link href={`/map?creator=${c.tiktok_username}`}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-gray-400">
+                  className="card flex items-center gap-3 p-3 border-2 border-transparent hover:border-ice transition-colors">
                   <Avatar creator={c} />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate">{c.display_name || c.tiktok_username}</p>
@@ -89,12 +91,13 @@ export default function Home() {
           </ul>
         </section>
 
-        <footer className="mt-16 pt-6 border-t border-gray-100 flex justify-center gap-6 text-xs text-gray-400">
-          <Link href="/signup" className="hover:text-gray-700">Become a creator</Link>
-          <Link href="/admin" className="hover:text-gray-700">Admin</Link>
+        <footer className="mt-16 pt-6 border-t border-gray-200 flex justify-center gap-6 text-xs font-semibold text-gray-500">
+          <Link href="/signup" className="hover:text-ink">Become a creator</Link>
+          <Link href="/admin" className="hover:text-ink">Admin</Link>
         </footer>
       </div>
     </main>
+    </>
   );
 }
 
@@ -104,8 +107,8 @@ function Section({ title, items, empty, moreHref, children }: {
   return (
     <section className="mt-10">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {moreHref && <Link href={moreHref} className="text-sm text-blue-600">See all →</Link>}
+        <h2 className="text-2xl font-semibold">{title}</h2>
+        {moreHref && <Link href={moreHref} className="text-sm font-bold text-glacier hover:underline">See all →</Link>}
       </div>
       {items === null && <Skeleton />}
       {items?.length === 0 && <p className="text-sm text-gray-500">{empty}</p>}
@@ -117,7 +120,7 @@ function Section({ title, items, empty, moreHref, children }: {
 function Avatar({ creator }: { creator: Creator }) {
   const letter = (creator.display_name || creator.tiktok_username).charAt(0).toUpperCase();
   return (
-    <div className="relative w-11 h-11 rounded-full bg-blue-100 text-blue-700 font-semibold flex items-center justify-center shrink-0 overflow-hidden">
+    <div className="relative w-11 h-11 rounded-full bg-frost text-glacier font-bold flex items-center justify-center shrink-0 overflow-hidden">
       {letter}
       {creator.avatar_url && (
         <img src={creator.avatar_url} referrerPolicy="no-referrer" alt=""
@@ -132,7 +135,7 @@ function Skeleton({ rows }: { rows?: boolean }) {
   return (
     <div className={`grid gap-3 ${rows ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3'}`}>
       {[0, 1, 2].map((i) => (
-        <div key={i} className={`rounded-xl bg-gray-100 animate-pulse ${rows ? 'h-16' : 'aspect-[4/5]'}`} />
+        <div key={i} className={`rounded-xl bg-white animate-pulse ${rows ? 'h-16' : 'aspect-[4/5]'}`} />
       ))}
     </div>
   );
