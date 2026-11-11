@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const { user, supabase } = auth;
 
   const { data: creator } = await supabase
-    .from('creators').select('id, tiktok_username').eq('id', user.id).single();
+    .from('creators').select('id, tiktok_username, display_name').eq('id', user.id).single();
   if (!creator) return NextResponse.json({ error: 'Creator profile not found.' }, { status: 404 });
 
   let latest;
@@ -87,7 +87,14 @@ export async function POST(request: Request) {
     if (hit) mapped++;
   }
 
-  await supabase.from('creators').update({ last_synced_at: new Date().toISOString() }).eq('id', creator.id);
+  // Keep the profile fresh: TikTok avatar links expire, and swap the default name for their TikTok nickname.
+  const profile: Record<string, unknown> = { last_synced_at: new Date().toISOString() };
+  const author = latest[0];
+  if (author?.authorAvatar) profile.avatar_url = author.authorAvatar;
+  if (author?.authorNickname && (!creator.display_name || creator.display_name === creator.tiktok_username)) {
+    profile.display_name = author.authorNickname;
+  }
+  await supabase.from('creators').update(profile).eq('id', creator.id);
 
   return NextResponse.json({
     checked: latest.length,
