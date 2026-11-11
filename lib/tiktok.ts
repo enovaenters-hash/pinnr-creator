@@ -97,7 +97,12 @@ function nameFromHandle(h: string): string {
 /** True when an auto-picked "name" is really a sentence from the caption. */
 export function looksLikeSentence(name: string | null | undefined): boolean {
   if (!name) return false;
-  return /[“”"!?]|\.\s/.test(name) || name.split(/\s+/).length > 8 || name.length > 60;
+  if (/[“”"!?]|\.\s/.test(name) || name.split(/\s+/).length > 8 || name.length > 60) return true;
+  // Two or more everyday sentence words ("After serving their community for 38 years").
+  const words = name.toLowerCase().match(/[a-z’']+/g) ?? [];
+  const glue = new Set(['i', 'i’m', "i'm", 'my', 'me', 'we', 'our', 'us', 'he', 'she', 'his', 'her', 'their', 'they',
+    'this', 'that', 'for', 'to', 'was', 'is', 'are', 'have', 'had', 'been', 'just', 'when', 'who', 'after', 'before', 'about']);
+  return words.filter((w) => glue.has(w)).length >= 2;
 }
 
 /**
