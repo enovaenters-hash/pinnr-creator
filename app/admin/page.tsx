@@ -8,6 +8,7 @@ import { categoryColor, type Creator, type Video } from '@/lib/types';
 import type { PublicVideo } from '@/components/PublicMap';
 import VideoEditForm from '@/components/VideoEditForm';
 import { NotConfigured } from '@/components/AuthCard';
+import SiteNav from '@/components/SiteNav';
 
 type Tab = 'featured' | 'locations' | 'creators';
 type Status = 'loading' | 'signedOut' | 'denied' | 'ready';
@@ -95,23 +96,21 @@ export default function AdminPage() {
   if (status === 'denied') return <Center>This account doesn&apos;t have admin access. <Link href="/" className="text-blue-600">Home</Link></Center>;
 
   return (
-    <main className="flex-1 bg-white text-gray-900">
+    <>
+    <SiteNav active="admin" />
+    <main className="flex-1 bg-cloud text-ink">
       <div className="max-w-5xl mx-auto px-4 pb-16">
-        <header className="py-5 flex items-center justify-between">
+        <header className="py-6 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold">Pinnr Admin</h1>
+            <h1 className="text-2xl font-semibold">POVGo Admin</h1>
             <p className="text-xs text-gray-500">{creators.length} creators · {videos.length} videos · {videos.filter((v) => v.lat !== null).length} on map</p>
-          </div>
-          <div className="flex gap-2 text-xs">
-            <Link href="/" className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">Home</Link>
-            <Link href="/map" className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">Fan view</Link>
           </div>
         </header>
 
-        <nav className="flex gap-1 border-b border-gray-200 mb-4 text-sm">
+        <nav className="flex gap-2 mb-5 text-sm overflow-x-auto">
           {([['featured', 'Featured Locations'], ['locations', 'All Locations'], ['creators', 'Creators']] as [Tab, string][]).map(([t, label]) => (
             <button key={t} onClick={() => { setTab(t); setMsg(null); }}
-              className={`px-3 py-2 -mb-px border-b-2 ${tab === t ? 'border-gray-900 font-semibold' : 'border-transparent text-gray-500'}`}>
+              className={`px-4 py-2 rounded-full font-bold whitespace-nowrap ${tab === t ? 'bg-ink text-white' : 'bg-white text-gray-600 hover:text-ink'}`}>
               {label}
             </button>
           ))}
@@ -124,6 +123,7 @@ export default function AdminPage() {
         {tab === 'creators' && <CreatorsTab creators={creators} videos={videos} me={me} onDelete={deleteCreator} />}
       </div>
     </main>
+    </>
   );
 }
 
@@ -149,12 +149,12 @@ function FeaturedTab({ videos, slots, onSet }: {
         {[1, 2, 3].map((slot) => {
           const v = slots[slot] ? byId[slots[slot]] : undefined;
           return (
-            <div key={slot} className={`rounded-xl border p-3 ${picking === slot ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'}`}>
+            <div key={slot} className={`rounded-xl border p-3 ${picking === slot ? 'border-ice ring-4 ring-frost bg-white' : 'border-white bg-white'}`}>
               <p className="text-xs font-semibold text-gray-500 mb-2">★ Featured #{slot}</p>
               {v ? <MiniSpot v={v} /> : <p className="text-sm text-gray-400 py-6 text-center">Empty</p>}
               <div className="flex gap-2 mt-3">
                 <button onClick={() => { setPicking(picking === slot ? null : slot); setQ(''); }}
-                  className="flex-1 py-1.5 text-sm rounded-md bg-blue-600 text-white font-medium">
+                  className="btn-sun flex-1 py-1.5 text-sm">
                   {picking === slot ? 'Cancel' : v ? 'Change' : 'Choose'}
                 </button>
                 {v && <button onClick={() => onSet(slot, null)} className="px-3 py-1.5 text-sm rounded-md border border-gray-200">Remove</button>}
@@ -165,7 +165,7 @@ function FeaturedTab({ videos, slots, onSet }: {
       </div>
 
       {picking !== null && (
-        <div className="mt-5 border border-gray-200 rounded-xl p-3">
+        <div className="mt-5 card p-3">
           <p className="text-sm font-semibold mb-2">Choose a spot for Featured #{picking}</p>
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search place, address, category or @creator"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -220,7 +220,7 @@ function LocationsTab({ videos, creators, onSave }: {
       <p className="text-xs text-gray-500 mb-2">{shown.length} videos</p>
       <ul className="space-y-2">
         {shown.slice(0, 200).map((v) => (
-          <li key={v.id} className="border border-gray-200 rounded-lg p-3">
+          <li key={v.id} className="card p-3">
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0"><MiniSpot v={v} showStatus /></div>
               <button onClick={() => setEditing(editing === v.id ? null : v.id)} className="text-sm text-blue-600 font-medium shrink-0">
@@ -258,7 +258,7 @@ function CreatorsTab({ creators, videos, me, onDelete }: {
   }, [videos]);
 
   return (
-    <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl">
+    <ul className="divide-y divide-gray-100 card">
       {creators.map((c) => (
         <li key={c.id} className="p-3 flex flex-wrap items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 font-semibold flex items-center justify-center shrink-0">
@@ -327,5 +327,5 @@ function MiniSpot({ v, showStatus }: { v: PublicVideo; showStatus?: boolean }) {
 }
 
 function Center({ children }: { children: React.ReactNode }) {
-  return <main className="flex-1 flex items-center justify-center p-6 text-sm text-gray-600 text-center">{children}</main>;
+  return <><SiteNav active="admin" /><main className="flex-1 flex items-center justify-center p-6 text-sm text-gray-600 text-center">{children}</main></>;
 }
