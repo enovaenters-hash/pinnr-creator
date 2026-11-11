@@ -28,7 +28,7 @@ type CreatorInfo = { handle: string; name: string; avatar: string | null; accent
 const LABELS: Record<string, string> = { soulfood: 'Soul Food', bbq: 'BBQ', cafe: 'Café', other: 'Other' };
 const cLabel = (c: string) => LABELS[c] ?? c.charAt(0).toUpperCase() + c.slice(1);
 const cColor = (c: string) => categoryColor(c);
-const formatDate = (d: string) => { if (!d) return 'N/A'; const [y, m] = d.split('-'); return m && y ? `${m}/01/${y.slice(-2)}` : 'N/A'; };
+const formatDate = (d: string) => { if (!d) return 'N/A'; const [y, m, day] = d.split('-'); return m && y ? `${m}/${day || '01'}/${y.slice(-2)}` : 'N/A'; };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const ACCENTS = ['#ff2d55', '#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#db2777', '#65a30d'];
 
@@ -51,7 +51,7 @@ function groupPlaces(rows: Row[]): { places: Place[]; creators: CreatorInfo[] } 
     };
     const addrKey = (r.address ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') || `${r.lat.toFixed(4)},${r.lng.toFixed(4)}`;
     const key = `${handle}|${addrKey}`;
-    const vid: Vid = { id: r.tiktok_id, date: (r.posted_at ?? '').slice(0, 7), dbId: r.id, code: r.discount_code };
+    const vid: Vid = { id: r.tiktok_id, date: (r.posted_at ?? '').slice(0, 10), dbId: r.id, code: r.discount_code };
     if (!byKey[key]) {
       creatorMap[handle].count++;
       byKey[key] = {
@@ -219,7 +219,8 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         const right = $('pubRight');
         right.dataset.loc = locationId;
         right.innerHTML = `
-          <div class="rv"><iframe src="https://www.tiktok.com/player/v1/${encodeURIComponent(v.id)}?autoplay=1&description=1&music_info=0" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe><button class="mback" data-act="back">← Back to Map</button>${clipnav}</div>
+          <div class="rv"><iframe src="${playerSrc(v.id)}" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe><button class="mback" data-act="back">← Back to Map</button>${clipnav}</div>
+          <div class="rretry">Video not showing? <button data-act="reload">↻ Reload video</button> or watch it on TikTok below.</div>
           <div class="rmeta ${collapsed ? 'collapsed' : ''}">
             <h3 data-act="toggle"><span>${esc(p.name)}</span><span class="tag-in-header" style="background:${cColor(p.cuisine)}">#${esc(p.cuisine)}</span><span class="toggle-arrow">▼</span></h3>
             ${combinedMode ? `<div class="rby"><span class="d" style="background:${p.accent}"></span>@${esc(p.creator)} · ${esc(p.creatorName)}</div>` : ''}
@@ -233,7 +234,12 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
           </div>`;
       }
 
-      // Clicks inside the player panel (clip nav, date buttons, back, collapse).
+      /** TikTok's embedded player sometimes stays black or errors; reloading it usually fixes that. */
+      function playerSrc(id: string, bust = false) {
+        return `https://www.tiktok.com/player/v1/${encodeURIComponent(id)}?autoplay=1&description=1&music_info=0${bust ? `&r=${Date.now()}` : ''}`;
+      }
+
+      // Clicks inside the player panel (clip nav, date buttons, back, collapse, reload).
       $('pubRight').onclick = (e) => {
         const t = (e.target as HTMLElement).closest('[data-g],[data-act]') as HTMLElement | null;
         if (!t) return;
@@ -241,6 +247,17 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         if (t.dataset.act === 'back') {
           if (pubVidP) pubmap?.flyTo([pubVidP.lat, pubVidP.lon], 14, { duration: 0.5 });
           $('pubRight').classList.remove('show');
+        }
+        if (t.dataset.act === 'reload') {
+          const old = $('pubRight').querySelector('iframe');
+          const id = old?.src.match(/player\/v1\/(\d+)/)?.[1];
+          if (old && id) {
+            const fresh = document.createElement('iframe');
+            fresh.allow = 'autoplay;encrypted-media;fullscreen';
+            fresh.allowFullscreen = true;
+            fresh.src = playerSrc(id, true);
+            old.replaceWith(fresh);
+          }
         }
         if (t.dataset.act === 'toggle') {
           const id = $('pubRight').dataset.loc ?? '';
