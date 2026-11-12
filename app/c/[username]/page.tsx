@@ -1,11 +1,11 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import FanMap from '@/components/FanMap';
+import CreatorPage from '@/components/CreatorPage';
 
-/** Shareable creator map: /c/<tiktok username> — the fan map opened on that creator. */
-export default function CreatorMapPage() {
+/** Shareable creator page: /c/<tiktok username> — their Top 3, then their map. */
+export default function CreatorRoute() {
   const { username } = useParams<{ username: string }>();
   const handle = decodeURIComponent(username ?? '').replace(/^@/, '').toLowerCase();
-  return <FanMap initialCreator={handle} />;
+  return <CreatorPage key={handle} handle={handle} />;
 }
