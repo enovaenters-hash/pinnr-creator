@@ -22,6 +22,15 @@ export const FAN_CSS = `
   .pubnav a.on{background:#fff;color:var(--ink);opacity:1;box-shadow:0 1px 3px rgba(19,41,58,.15)}
   .pubbar .pubsel{background:#fff;color:var(--ink);border:0;border-radius:999px;font-family:inherit;font-size:13px;font-weight:800;padding:7px 12px;max-width:46vw;outline:none;cursor:pointer}
   .pubmain{flex:1;display:flex;min-height:0;position:relative}
+  .pubview{background:var(--accent);color:var(--accent-ink);text-decoration:none;font-size:13px;font-weight:900;padding:7px 14px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 0 #f2c21a}
+  .pubview[hidden]{display:none}
+  .clink{color:inherit;font-weight:800;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px}
+  .clink:hover{color:var(--glacier)}
+  .rmeta .clink:hover{color:var(--bar)}
+  /* Embedded in the creator page: a rounded block in the page flow instead of full screen. */
+  #pub.embed{position:relative;inset:auto;z-index:0;height:min(78vh,720px);min-height:520px;border-radius:20px;overflow:hidden;box-shadow:0 6px 20px rgba(19,41,58,.08);border:2px solid #fff}
+  #pub.embed .pubbar{display:none}
+  #pub.embed .clipnav{position:absolute;top:52px;right:12px}
   .publeft{width:280px;min-width:280px;border-right:1px solid var(--line);display:flex;flex-direction:column;background:#fff;z-index:100}
   .publeft .srch{padding:12px 14px 9px;display:flex;gap:6px;align-items:center}
   .publeft .srch input{flex:1;min-width:0;padding:9px 14px;border:2px solid var(--line);border-radius:999px;font-family:inherit;font-size:13px;outline:none}

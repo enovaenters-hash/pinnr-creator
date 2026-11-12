@@ -74,12 +74,18 @@ function groupPlaces(rows: Row[]): { places: Place[]; creators: CreatorInfo[] } 
   return { places, creators: Object.values(creatorMap).sort((a, b) => b.count - a.count) };
 }
 
-export default function FanMap({ initialCreator = null }: { initialCreator?: string | null }) {
+/**
+ * embedded: render inside a page (the creator page) instead of full screen. The top bar is hidden,
+ * only `initialCreator`'s spots are shown, and other parts of the page can open a spot by firing
+ * `window.dispatchEvent(new CustomEvent('povgo:focus', { detail: { id: <video id>, play: true } }))`.
+ */
+export default function FanMap({ initialCreator = null, embedded = false }: { initialCreator?: string | null; embedded?: boolean }) {
   useEffect(() => {
     if (!supabaseConfigured) return;
     let disposed = false;
     let pubmap: Leaflet.Map | null = null;
     let onPlayerMessage: ((e: MessageEvent) => void) | null = null;
+    let onFocus: ((e: Event) => void) | null = null;
 
     (async () => {
       const L = (await import('leaflet')).default;
@@ -130,7 +136,9 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         combinedMode = !CUR;
         ACCENT = SUN;
         $('pub').style.setProperty('--accent', ACCENT);
-        PUBSET = CUR ? ALL.filter((p) => p.creator === CUR) : ALL;
+        PUBSET = CUR ? ALL.filter((p) => p.creator === CUR) : embedded ? [] : ALL;
+        const view = document.getElementById('pubView') as HTMLAnchorElement | null;
+        if (view) { view.hidden = !CUR; if (CUR) view.href = `/c/${encodeURIComponent(CUR)}`; }
         sel.value = CUR ?? '';
         const pfp = $('pubPfp');
         pfp.innerHTML = c?.avatar ? `<img src="${esc(c.avatar)}" referrerpolicy="no-referrer" alt="" onerror="this.parentNode.innerHTML=window.__povgoPin">` : HOME_PIN;
@@ -159,7 +167,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
 
       function showPub() {
         if (!pubmap) {
-          pubmap = L.map('pubmap', { zoomControl: true });
+          pubmap = L.map('pubmap', { zoomControl: true, scrollWheelZoom: !embedded });
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(pubmap);
         }
         pubActive.clear(); pubQuery = ''; pubSel = -1; pubVidP = null;
@@ -243,7 +251,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
           <div class="rv"><div class="rstage">${playMode ? playerHtml(v) : posterHtml(v)}</div><button class="mback" data-act="back">← Back to Map</button>${clipnav}</div>
           <div class="rmeta ${collapsed ? 'collapsed' : ''}">
             <h3 data-act="toggle"><span>${esc(p.name)}</span><span class="tag-in-header" style="background:${cColor(p.cuisine)}">#${esc(p.cuisine)}</span><span class="toggle-arrow">▼</span></h3>
-            ${combinedMode ? `<div class="rby"><span class="d" style="background:${p.accent}"></span>@${esc(p.creator)} · ${esc(p.creatorName)}</div>` : ''}
+            ${combinedMode ? `<div class="rby"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}">@${esc(p.creator)}</a> · ${esc(p.creatorName)}</div>` : ''}
             <div class="raddr">📍 ${esc(p.addr)}</div>
             ${v.code ? `<div class="rcode">🏷 Code: ${esc(v.code)}</div>` : ''}
             <div class="info-row">${grid}</div>
@@ -357,7 +365,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         PUBSET.forEach((p, i) => {
           const card = document.createElement('div'); card.className = 'pcard' + (i === pubSel ? ' on' : ''); card.dataset.i = String(i);
           card.innerHTML = `<h4>${esc(p.name)}</h4>
-            ${combinedMode ? `<div class="by"><span class="d" style="background:${p.accent}"></span>@${esc(p.creator)}</div>` : ''}
+            ${combinedMode ? `<div class="by"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a></div>` : ''}
             <div class="mt"><span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}</div>`;
           card.onclick = () => selectPub(i);
           el.appendChild(card);
@@ -394,25 +402,36 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
       // ── Start: creator from URL, then focus a specific video if asked (?focus=<video id>) ──
       let start = CREATORS.some((c) => c.handle === want) ? want : null;
       const focusPlace = focusId ? ALL.find((p) => p.videos.some((v) => v.dbId === focusId)) : undefined;
-      if (focusPlace && start && focusPlace.creator !== start) start = null;
+      if (focusPlace && start && focusPlace.creator !== start && !embedded) start = null;
       openPub(start);
-      if (focusPlace) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
+      if (focusPlace && PUBSET.includes(focusPlace)) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
+
+      // Other parts of the page (the creator page's top 3) can open a spot here.
+      onFocus = (e: Event) => {
+        const { id, play } = (e as CustomEvent<{ id: string; play?: boolean }>).detail ?? {};
+        const place = PUBSET.find((p) => p.videos.some((v) => v.dbId === id));
+        if (!place) return;
+        selectPub(PUBSET.indexOf(place), id);
+        if (play) startPlayer();
+      };
+      window.addEventListener('povgo:focus', onFocus);
     })();
 
     return () => {
       disposed = true;
       if (onPlayerMessage) window.removeEventListener('message', onPlayerMessage);
+      if (onFocus) window.removeEventListener('povgo:focus', onFocus);
       pubmap?.remove(); pubmap = null;
     };
-  }, [initialCreator]);
+  }, [initialCreator, embedded]);
 
   if (!supabaseConfigured) return <p className="p-6 text-sm">Supabase isn&apos;t connected yet.</p>;
 
   return (
     <>
       <style>{FAN_CSS}</style>
-      <div id="pub">
-        <div className="pubbar">
+      <div id="pub" className={embedded ? 'embed' : undefined}>
+        <div className="pubbar" hidden={embedded}>
           <a className="publogo" href="/" aria-label="POVGo home"><Logo tone="onIce" className="h-[30px] w-auto" /></a>
           <span className="pubdiv" aria-hidden="true" />
           <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
@@ -422,6 +441,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
             <a href="/map" className="on" aria-current="page">Fan Map</a>
             <a href="/dashboard">Creator Login</a>
           </nav>
+          <a className="pubview" id="pubView" href="/map" hidden>View page</a>
           <select className="pubsel" id="pubCreator" aria-label="Choose creator"><option>All creators</option></select>
         </div>
         <div className="pubchips-wrapper">
