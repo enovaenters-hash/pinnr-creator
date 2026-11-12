@@ -8,6 +8,7 @@ import { categoryColor } from '@/lib/types';
 import { FAN_CSS } from './fanMapStyles';
 import { pinSvg, ICE, SUN } from '@/lib/brand';
 import Logo from '@/components/Logo';
+import NavLinks from '@/components/NavLinks';
 
 /**
  * The fan map, matching the original layout (keen-lollipop-93bfb2.netlify.app):
@@ -436,11 +437,8 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
           <span className="pubdiv" aria-hidden="true" />
           <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
           <div className="pubwho"><div className="nm" id="pubName">All Spots</div><div className="h" id="pubHandle">Loading…</div></div>
-          <nav className="pubnav" aria-label="Main">
-            <a href="/">Home</a>
-            <a href="/map" className="on" aria-current="page">Fan Map</a>
-            <a href="/dashboard">Creator Login</a>
-          </nav>
+          <NavLinks active="map" className="pubnav" />
+          <span className="pubbreak" aria-hidden="true" />
           <a className="pubview" id="pubView" href="/map" hidden>View page</a>
           <select className="pubsel" id="pubCreator" aria-label="Choose creator"><option>All creators</option></select>
         </div>

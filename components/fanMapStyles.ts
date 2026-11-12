@@ -16,10 +16,9 @@ export const FAN_CSS = `
   .pubbar .pfp img{width:100%;height:100%;object-fit:cover}
   .pubbar .nm{font-family:var(--display);font-weight:600;font-size:16px;line-height:1.2}.pubbar .h{font-size:12px;font-weight:700;opacity:.75}
   .pubbar .pubtag{background:rgba(255,255,255,.92);color:#12141a;font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px}
-  .pubnav{display:flex;gap:6px;margin-left:auto}
-  .pubnav a{color:var(--ink);text-decoration:none;font-size:13px;font-weight:800;padding:7px 14px;border-radius:999px;white-space:nowrap;opacity:.85}
-  .pubnav a:hover{background:rgba(255,255,255,.4);opacity:1}
-  .pubnav a.on{background:#fff;color:var(--ink);opacity:1;box-shadow:0 1px 3px rgba(19,41,58,.15)}
+  .pubnav{margin-left:auto}
+  .pubnav a{text-decoration:none}
+  .pubbreak{display:none}
   .pubbar .pubsel{background:#fff;color:var(--ink);border:0;border-radius:999px;font-family:inherit;font-size:13px;font-weight:800;padding:7px 12px;max-width:46vw;outline:none;cursor:pointer}
   .pubmain{flex:1;display:flex;min-height:0;position:relative}
   .pubview{background:var(--accent);color:var(--accent-ink);text-decoration:none;font-size:13px;font-weight:900;padding:7px 14px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 0 #f2c21a}
@@ -116,11 +115,19 @@ export const FAN_CSS = `
 
   @media(max-width:760px){
     .pubbar{flex-wrap:wrap;row-gap:8px;padding:10px 14px}
-    .pubbar .pubsel{margin-left:auto}
+    /* Row 1: logo + Home · Map · Login. Row 2: creator photo, name, View page, creator menu. */
     .pubdiv{display:none}
-    .pubwho{order:4;width:100%}
-    .pubnav{order:3;width:100%;margin-left:0}
-    .pubnav a{flex:1;text-align:center;padding:6px 8px}
+    .publogo svg{height:26px !important}
+    .pubnav{order:1;margin-left:auto}
+    .pubbreak{display:block;order:2;flex-basis:100%;height:0}
+    .pubbar .pfp{order:3}
+    .pubwho{order:4;flex:1 1 0;min-width:0}
+    .pubwho .nm,.pubwho .h{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pubbar .pfp{width:32px;height:32px}
+    .pubwho .nm{font-size:14px}
+    .pubwho .h{font-size:11px}
+    .pubview{order:5;font-size:12px;padding:6px 11px}
+    .pubbar .pubsel{order:6;max-width:34vw;font-size:12px;padding:6px 8px}
     .pubmain{display:block;position:relative}
     #pubmap{position:absolute;top:0;left:0;right:0;bottom:0}
     .publeft{position:absolute;left:0;right:0;bottom:0;width:auto;min-width:0;height:64%;border-right:0;

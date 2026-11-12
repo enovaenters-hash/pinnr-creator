@@ -8,7 +8,7 @@ export function AuthCard({
 }: { title: string; subtitle: string; children: React.ReactNode; footer: React.ReactNode }) {
   return (
     <>
-    <SiteNav active="creator" />
+    <SiteNav active="login" />
     <main className="flex-1 flex items-center justify-center px-4 py-12 bg-cloud">
       <div className="w-full max-w-sm">
         <div className="card p-7">
