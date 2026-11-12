@@ -78,7 +78,7 @@ export default function Home() {
           <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {newCreators?.map((c) => (
               <li key={c.id}>
-                <Link href={`/map?creator=${c.tiktok_username}`}
+                <Link href={`/c/${c.tiktok_username}`}
                   className="card flex items-center gap-3 p-3 border-2 border-transparent hover:border-ice transition-colors">
                   <Avatar creator={c} />
                   <div className="min-w-0">
