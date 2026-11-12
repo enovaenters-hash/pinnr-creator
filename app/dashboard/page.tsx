@@ -110,12 +110,12 @@ export default function Dashboard() {
     return <main className="max-w-xl mx-auto p-6"><NotConfigured /></main>;
   }
   if (loading) {
-    return <><SiteNav active="creator" /><main className="flex-1 flex items-center justify-center text-sm text-gray-500">Loading…</main></>;
+    return <><SiteNav active="login" /><main className="flex-1 flex items-center justify-center text-sm text-gray-500">Loading…</main></>;
   }
 
   return (
     <>
-    <SiteNav active="creator" />
+    <SiteNav active="login" />
     <main className="flex-1 bg-cloud text-ink">
       <div className="max-w-5xl mx-auto px-4 pb-16">
         {/* Header — V16 full-width stack */}
