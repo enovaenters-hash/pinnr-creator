@@ -272,7 +272,7 @@ function CreatorsTab({ creators, videos, me, onDelete }: {
             </p>
           </div>
           <div className="flex gap-2 text-xs">
-            <Link href={`/map?creator=${c.tiktok_username}`} className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">Map</Link>
+            <Link href={`/c/${c.tiktok_username}`} className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">Page</Link>
             <a href={`https://www.tiktok.com/@${c.tiktok_username}`} target="_blank" rel="noopener" className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">TikTok ↗</a>
             {c.id !== me && (
               <button onClick={() => { setConfirming(confirming === c.id ? null : c.id); setTyped(''); }}
