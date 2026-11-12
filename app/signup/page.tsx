@@ -30,7 +30,7 @@ export default function SignupPage() {
       .from('creators').select('id').eq('tiktok_username', username).maybeSingle();
     if (taken) {
       setBusy(false);
-      setError(`@${username} already has a Pinnr account. Try signing in.`);
+      setError(`@${username} already has a POVGo account. Try signing in.`);
       return;
     }
 
