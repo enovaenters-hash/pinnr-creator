@@ -1,4 +1,4 @@
-# Pinnr — creator maps from TikTok (Phase 2)
+# POVGo — creator maps from TikTok (Phase 2)
 
 Creators sign up with email + their TikTok username, tap **Sync Videos**, and their
 latest TikToks land on a public map. Fans browse one creator (`/c/<username>`) or
