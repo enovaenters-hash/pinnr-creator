@@ -87,7 +87,7 @@ export default function Dashboard() {
   async function share() {
     try {
       await navigator.clipboard.writeText(publicUrl);
-      setStatus({ text: 'Map link copied', tone: 'ok' });
+      setStatus({ text: 'Page link copied', tone: 'ok' });
     } catch {
       setStatus({ text: publicUrl, tone: 'info' });
     }
