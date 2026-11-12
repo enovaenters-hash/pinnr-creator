@@ -102,19 +102,24 @@ export default function CreatorPage({ handle }: { handle: string }) {
       <SiteNav />
       <main className="flex-1 bg-cloud text-ink">
         <div className="max-w-5xl mx-auto px-4 pb-16">
-          {/* Who */}
-          <header className="pt-6 pb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
+          {/* Who: photo, then name (shrinks to fit one line) over handle + small buttons */}
+          <header className="pt-5 pb-4 flex items-center gap-3 sm:gap-4">
             <Avatar creator={creator} handle={handle} />
-            <div className="min-w-0">
-              <h1 className="font-display text-3xl sm:text-4xl font-semibold leading-tight truncate">{name}&apos;s Top 3</h1>
-              <p className="text-sm font-bold text-gray-500">
-                @{handle}{spots !== null && <> · {spots} spot{spots === 1 ? '' : 's'}</>}
-              </p>
-            </div>
-            <div className="flex gap-2 ml-auto">
-              <button onClick={share} className="btn-ghost px-4 py-2 text-sm">{copied ? 'Link copied' : 'Share'}</button>
-              <a href={`https://www.tiktok.com/@${encodeURIComponent(handle)}`} target="_blank" rel="noopener"
-                className="btn-sun px-4 py-2 text-sm">▶ TikTok</a>
+            <div className="min-w-0 flex-1 [container-type:inline-size]">
+              <h1 className="font-display font-semibold leading-[1.1] whitespace-nowrap overflow-hidden text-ellipsis"
+                style={{ fontSize: `min(2.25rem, calc(100cqi / ${((name.length + 8) * 0.56).toFixed(2)}))` }}>
+                {name}&apos;s Top 3
+              </h1>
+              <div className="mt-1 flex items-center gap-2">
+                <p className="min-w-0 truncate text-[11px] min-[380px]:text-xs sm:text-sm font-bold text-gray-500">
+                  @{handle}{spots !== null && <> · {spots} spot{spots === 1 ? '' : 's'}</>}
+                </p>
+                <div className="ml-auto flex shrink-0 gap-1 sm:gap-1.5">
+                  <button onClick={share} className="btn-ghost px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs">{copied ? 'Copied' : 'Share'}</button>
+                  <a href={`https://www.tiktok.com/@${encodeURIComponent(handle)}`} target="_blank" rel="noopener"
+                    className="btn-sun px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs">▶ TikTok</a>
+                </div>
+              </div>
             </div>
           </header>
 
@@ -136,7 +141,6 @@ export default function CreatorPage({ handle }: { handle: string }) {
                         onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
                         className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
                     )}
-                    <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-sun text-ink grid place-items-center text-base sm:text-xl pl-1 shadow-lg transition-transform group-hover:scale-110" aria-hidden="true">▶</span>
                     <span className="absolute inset-x-0 bottom-0 px-2 sm:px-3 pt-8 pb-2 sm:pb-3 bg-gradient-to-t from-black/80 to-transparent text-white">
                       <span className="block font-display font-semibold text-[13px] sm:text-lg leading-tight truncate">{v.place_name || 'Spot'}</span>
                       <span className="block text-[10px] sm:text-xs font-bold opacity-85 truncate">
@@ -155,9 +159,9 @@ export default function CreatorPage({ handle }: { handle: string }) {
 
           {/* Their map */}
           <section id="creator-map" className="mt-8 scroll-mt-4">
-            <h2 className="text-2xl font-semibold mb-3 flex items-baseline gap-2">
+            <h2 className="text-xl sm:text-2xl font-semibold mb-3 flex flex-wrap items-baseline gap-x-2">
               All of {name}&apos;s spots
-              {spots !== null && <span className="text-sm font-bold text-gray-500 font-sans">{spots} on the map</span>}
+              {spots !== null && <span className="text-sm font-bold text-gray-500 font-sans whitespace-nowrap">{spots} on the map</span>}
             </h2>
             <FanMap initialCreator={handle} embedded />
           </section>
@@ -170,7 +174,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
 function Avatar({ creator, handle }: { creator: Creator | undefined; handle: string }) {
   const letter = (creator?.display_name || handle).charAt(0).toUpperCase();
   return (
-    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-frost text-glacier font-display text-2xl font-semibold flex items-center justify-center shrink-0 overflow-hidden border-4 border-white shadow">
+    <div className="relative w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-frost text-glacier font-display text-2xl font-semibold flex items-center justify-center shrink-0 overflow-hidden border-[3px] sm:border-4 border-white shadow">
       {letter}
       {creator?.avatar_url && (
         <img src={creator.avatar_url} referrerPolicy="no-referrer" alt=""
