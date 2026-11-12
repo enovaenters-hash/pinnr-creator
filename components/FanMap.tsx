@@ -34,7 +34,7 @@ const formatDate = (d: string) => { if (!d) return 'N/A'; const [y, m, day] = d.
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 // Creator dots in the All Spots view.
 const ACCENTS = ['#1c7fb0', '#f2a900', '#e8513b', '#7a5af8', '#13a877', '#d9468f', '#0e9fb5', '#6b8e23'];
-const HOME_PIN = pinSvg(22, '#ffffff', ICE, 'transparent');
+const HOME_PIN = pinSvg(22, '#ffffff', ICE, '#000000');
 
 function cityOf(addr: string): string {
   const parts = addr.split(',').map((s) => s.trim()).filter(Boolean);
@@ -287,6 +287,13 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
             <button data-act="retry">↻ Try again</button></div>`);
         }, 8000);
       }
+      // Leaving the video view: swap TikTok's player back to the cover so playback (and sound) stops.
+      function stopPlayer() {
+        if (slowTimer) clearTimeout(slowTimer);
+        playMode = false;
+        const stage = $('pubRight')?.querySelector('.rstage');
+        if (stage && curVid && stage.querySelector('iframe')) stage.innerHTML = posterHtml(curVid);
+      }
       function startPlayer(bust = false) {
         if (!curVid) return;
         playMode = true;
@@ -321,6 +328,7 @@ export default function FanMap({ initialCreator = null }: { initialCreator?: str
         if (!t) return;
         if (t.dataset.g !== undefined) { renderPubVideo(Number(t.dataset.g)); return; }
         if (t.dataset.act === 'back') {
+          stopPlayer();
           if (pubVidP) pubmap?.flyTo([pubVidP.lat, pubVidP.lon], 14, { duration: 0.5 });
           $('pubRight').classList.remove('show');
         }
