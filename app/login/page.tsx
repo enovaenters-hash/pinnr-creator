@@ -27,8 +27,8 @@ export default function LoginPage() {
   return (
     <AuthCard
       title="Welcome back"
-      subtitle="Sign in to manage your map."
-      footer={<>New here? <Link href="/signup" className="text-blue-600 font-medium">Create an account</Link></>}
+      subtitle="Sign in to your POVGo account."
+      footer={<>New here? Join as a <Link href="/signup?as=fan" className="text-blue-600 font-medium">fan</Link> or a <Link href="/signup" className="text-blue-600 font-medium">creator</Link></>}
     >
       <form onSubmit={onSubmit} className="space-y-3">
         <label className="block">
