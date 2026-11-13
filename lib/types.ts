@@ -5,7 +5,18 @@ export interface Creator {
   avatar_url: string | null;
   last_synced_at: string | null;
   created_at: string;
+  /** What the creator posts about; fans filter Discover by it. */
+  content_type?: string;
 }
+
+/** Content types a creator can attach to their feed. */
+export const CONTENT_TYPES = [
+  { key: 'food', label: 'Food' },
+  { key: 'fashion', label: 'Fashion' },
+  { key: 'travel', label: 'Travel' },
+  { key: 'events', label: 'Events' },
+  { key: 'other', label: 'Other' },
+] as const;
 
 export interface Video {
   id: string;
