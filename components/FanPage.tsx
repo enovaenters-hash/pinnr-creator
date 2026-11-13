@@ -112,7 +112,7 @@ export default function FanPage() {
         .filter((r) => r.videos).map((r) => ({ savedAt: r.created_at, video: r.videos! })));
       setLists(((l.data ?? []) as unknown as { id: string; name: string; list_items: { video_id: string }[] }[])
         .map((r) => ({ id: r.id, name: r.name, videoIds: (r.list_items ?? []).map((i) => i.video_id) })));
-      setCreators((c.data as FanCreator[]) ?? []);
+      setCreators(((c.data as FanCreator[]) ?? []).filter((x) => x.id !== id)); // don't offer to follow yourself
       const meta = session.user.user_metadata as { display_name?: string } | undefined;
       setName(me.data?.display_name || meta?.display_name || session.user.email?.split('@')[0] || 'there');
       setUid(id);
