@@ -102,6 +102,8 @@ export const FAN_CSS = `
   .rbtn{flex:1;text-align:center;padding:11px;border-radius:999px;font-family:inherit;font-size:13.5px;font-weight:900;text-decoration:none;cursor:pointer;border:0}
   .rbtn.go{background:var(--accent);color:var(--accent-ink);box-shadow:0 2px 0 #f2c21a}
   .rbtn.tt{background:#fff;color:var(--ink)}
+  .rbtn.sv{flex:0 0 auto;padding:11px 14px;background:rgba(255,255,255,.14);color:#fff}
+  .rbtn.sv.on{background:#fff;color:var(--ink)}
   .vcount{font-size:10px;font-weight:800;color:var(--glacier);background:var(--frost);border-radius:999px;padding:1px 5px;white-space:nowrap}
   .marker-pin{width:22px;height:22px;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.3)}
   .marker-badge{position:absolute;top:-7px;right:-9px;background:var(--ink);color:#fff;font-size:10px;font-weight:800;border-radius:999px;min-width:16px;height:16px;line-height:15px;text-align:center;padding:0 3px;border:1.5px solid #fff;z-index:3}
@@ -136,7 +138,7 @@ export const FAN_CSS = `
     .publeft.expanded{transform:translateY(0)}
     .sheethandle{display:block}
     .publeft .srch{padding-top:2px}
-    .pubright{position:fixed;inset:0;z-index:1200;width:100%;min-width:0;height:100%;border-left:0;flex-direction:column;
+    .pubright{position:fixed;inset:0;z-index:1400;width:100%;min-width:0;height:100%;border-left:0;flex-direction:column;
       transform:translateY(100%);transition:transform .3s ease}
     .pubright.show{transform:translateY(0)}
     .mback{display:inline-flex;align-items:center;gap:5px;position:absolute;top:12px;right:60px;z-index:20;

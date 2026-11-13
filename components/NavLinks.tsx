@@ -42,7 +42,7 @@ export default function NavLinks({ active, className = '' }: { active?: NavActiv
             <Link role="menuitem" href="/fan" onClick={() => setOpen(false)}
               className="flex flex-col rounded-xl px-3 py-2 text-ink hover:bg-frost">
               <span className="font-extrabold text-sm">Fan</span>
-              <span className="text-xs font-semibold text-gray-500">Coming soon</span>
+              <span className="text-xs font-semibold text-gray-500">Your feed, videos, lists and map</span>
             </Link>
             <Link role="menuitem" href="/dashboard" onClick={() => setOpen(false)}
               className="flex flex-col rounded-xl px-3 py-2 text-ink hover:bg-frost">

@@ -28,6 +28,8 @@ export default function CreatorPage({ handle }: { handle: string }) {
   const [top, setTop] = useState<Top[] | null>(null);
   const [spots, setSpots] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [uid, setUid] = useState<string | null>(null);
+  const [following, setFollowing] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -36,6 +38,13 @@ export default function CreatorPage({ handle }: { handle: string }) {
       const { data: c } = await supabase.from('creators').select('*').eq('tiktok_username', handle).maybeSingle();
       setCreator((c as Creator) ?? null);
       if (!c) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUid(session.user.id);
+        const { data: f } = await supabase.from('follows').select('creator_id')
+          .eq('user_id', session.user.id).eq('creator_id', c.id).maybeSingle();
+        setFollowing(Boolean(f));
+      }
       document.title = `${c.display_name || c.tiktok_username}'s Top 3 · POVGo`;
 
       // Top picks first (newest first); fill any empty slots with the newest mapped videos.
@@ -72,6 +81,18 @@ export default function CreatorPage({ handle }: { handle: string }) {
     window.dispatchEvent(new CustomEvent('povgo:focus', { detail: { id: v.id, play: true } }));
   }
 
+  async function toggleFollow() {
+    if (!creator) return;
+    if (!uid) { window.location.href = `/login?next=${encodeURIComponent(`/c/${handle}`)}`; return; }
+    const supabase = getSupabase();
+    const was = following;
+    setFollowing(!was);
+    const { error } = was
+      ? await supabase.from('follows').delete().eq('user_id', uid).eq('creator_id', creator.id)
+      : await supabase.from('follows').insert({ user_id: uid, creator_id: creator.id });
+    if (error) setFollowing(was);
+  }
+
   async function share() {
     const url = window.location.href;
     try {
@@ -96,6 +117,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
 
   const name = creator?.display_name || creator?.tiktok_username || handle;
   const cols = top && top.length ? top.length : 3;
+  const showFollow = Boolean(creator) && creator?.id !== uid;
 
   return (
     <>
@@ -106,10 +128,18 @@ export default function CreatorPage({ handle }: { handle: string }) {
           <header className="pt-5 pb-4 flex items-center gap-3 sm:gap-4">
             <Avatar creator={creator} handle={handle} />
             <div className="min-w-0 flex-1 [container-type:inline-size]">
-              <h1 className="font-display font-semibold leading-[1.1] whitespace-nowrap overflow-hidden text-ellipsis"
-                style={{ fontSize: `min(2.25rem, calc(100cqi / ${((name.length + 8) * 0.56).toFixed(2)}))` }}>
-                {name}&apos;s Top 3
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="min-w-0 flex-1 font-display font-semibold leading-[1.1] whitespace-nowrap overflow-hidden text-ellipsis"
+                  style={{ fontSize: `min(2.25rem, calc((100cqi - ${showFollow ? '5.75rem' : '0rem'}) / ${((name.length + 8) * 0.56).toFixed(2)}))` }}>
+                  {name}&apos;s Top 3
+                </h1>
+                {showFollow && (
+                  <button onClick={toggleFollow} aria-pressed={following}
+                    className={`shrink-0 px-3.5 py-1.5 text-xs sm:text-sm ${following ? 'btn-ghost' : 'btn-sun'}`}>
+                    {following ? 'Following' : '+ Follow'}
+                  </button>
+                )}
+              </div>
               <div className="mt-1 flex items-center gap-2">
                 <p className="min-w-0 truncate text-[11px] min-[380px]:text-xs sm:text-sm font-bold text-gray-500">
                   @{handle}{spots !== null && <> · {spots} spot{spots === 1 ? '' : 's'}</>}

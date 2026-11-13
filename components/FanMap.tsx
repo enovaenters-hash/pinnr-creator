@@ -96,6 +96,19 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
         .order('posted_at', { ascending: false }).limit(5000);
       if (disposed) return;
 
+      // Who is signed in, and which videos they've already saved (for the Save button).
+      const savedSet = new Set<string>();
+      let userId: string | null = null;
+      try {
+        const { data: { session } } = await getSupabase().auth.getSession();
+        if (session) {
+          userId = session.user.id;
+          const { data: sv } = await getSupabase().from('saved_videos').select('video_id').eq('user_id', userId);
+          (sv ?? []).forEach((r) => savedSet.add(r.video_id as string));
+        }
+      } catch { /* saving is optional; the map still works */ }
+      if (disposed) return;
+
       const { places: ALL, creators: CREATORS } = groupPlaces((data ?? []) as unknown as Row[]);
       const params = new URLSearchParams(window.location.search);
       const focusId = params.get('focus');
@@ -259,6 +272,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
             <div class="rbtns">
               <a class="rbtn go" target="_blank" rel="noopener" href="https://www.google.com/maps/search/${encodeURIComponent(p.addr)}">Directions ›</a>
               <a class="rbtn tt" target="_blank" rel="noopener" href="https://www.tiktok.com/@${encodeURIComponent(p.creator)}/video/${encodeURIComponent(v.id)}">▶ TikTok</a>
+              <button class="rbtn sv${savedSet.has(v.dbId) ? ' on' : ''}" data-act="save" data-id="${esc(v.dbId)}" aria-pressed="${savedSet.has(v.dbId)}">${savedSet.has(v.dbId) ? '♥ Saved' : '♡ Save'}</button>
             </div>
           </div>`;
         if (playMode) watchForSlowPlayer();
@@ -331,6 +345,24 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
       };
       window.addEventListener('message', onPlayerMessage);
 
+      // Save a video to the signed-in fan's My Videos (sends signed-out visitors to sign in first).
+      async function toggleSave(dbId: string, btn: HTMLElement) {
+        if (!userId) { window.location.href = `/login?next=${encodeURIComponent(`/map?focus=${dbId}`)}`; return; }
+        const was = savedSet.has(dbId);
+        if (was) savedSet.delete(dbId); else savedSet.add(dbId);
+        const paint = () => {
+          const on = savedSet.has(dbId);
+          btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', String(on));
+          btn.textContent = on ? '♥ Saved' : '♡ Save';
+        };
+        paint();
+        const supabase = getSupabase();
+        const { error } = was
+          ? await supabase.from('saved_videos').delete().eq('user_id', userId).eq('video_id', dbId)
+          : await supabase.from('saved_videos').insert({ user_id: userId, video_id: dbId });
+        if (error) { if (was) savedSet.add(dbId); else savedSet.delete(dbId); paint(); }
+      }
+
       // Clicks inside the player panel (clip nav, date buttons, back, collapse, reload).
       $('pubRight').onclick = (e) => {
         const t = (e.target as HTMLElement).closest('[data-g],[data-act]') as HTMLElement | null;
@@ -341,6 +373,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
           if (pubVidP) pubmap?.flyTo([pubVidP.lat, pubVidP.lon], 14, { duration: 0.5 });
           $('pubRight').classList.remove('show');
         }
+        if (t.dataset.act === 'save' && t.dataset.id) { toggleSave(t.dataset.id, t); return; }
         if (t.dataset.act === 'play') startPlayer();
         if (t.dataset.act === 'retry') startPlayer(true);
         if (t.dataset.act === 'toggle') {
