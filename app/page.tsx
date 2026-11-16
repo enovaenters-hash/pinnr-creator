@@ -9,11 +9,9 @@ import type { PublicVideo } from '@/components/PublicMap';
 import PosterTile from '@/components/PosterTile';
 import ExploreVideos from '@/components/ExploreVideos';
 import SiteNav from '@/components/SiteNav';
-import { categoryColor } from '@/lib/types';
-import type { MapPin } from '@/components/Map';
 
-// The home map is a Phoenix preview; the full map lives at /map.
-const Map = dynamic(() => import('@/components/Map'), { ssr: false });
+// The home map is the same map as /map (pins open the video), starting on Phoenix.
+const FanMap = dynamic(() => import('@/components/FanMap'), { ssr: false });
 const PHOENIX = { center: [33.4484, -112.074] as [number, number], zoom: 10 };
 
 type NewCreator = Creator & { spots: number };
@@ -77,12 +75,6 @@ export default function Home() {
     })();
   }, []);
 
-  const pins: MapPin[] = (mapVideos ?? []).map((v) => ({
-    id: v.id, lat: v.lat!, lng: v.lng!, title: v.place_name || 'Spot',
-    subtitle: [v.creators ? `@${v.creators.tiktok_username}` : null, v.address].filter(Boolean).join(' · '),
-    cover: v.cover_url, href: v.video_url, color: categoryColor(v.category),
-  }));
-
   return (
     <>
     <SiteNav active="home" />
@@ -103,11 +95,8 @@ export default function Home() {
             </dl>
 
             {/* Phoenix content map */}
-            <div className="relative z-0 h-[46vh] min-h-[320px] max-h-[520px] rounded-3xl overflow-hidden shadow-[0_8px_24px_rgba(19,41,58,.12)] lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:h-full lg:max-h-none lg:min-h-[460px]">
-              <Map pins={pins} view={PHOENIX} preview />
-              <span className="absolute right-3 top-3 z-[500] inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[13px] font-extrabold shadow-md">
-                <i className="h-2 w-2 rounded-full bg-emerald-500" />Phoenix, AZ
-              </span>
+            <div className="relative h-[46vh] min-h-[320px] max-h-[520px] lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:h-full lg:max-h-none lg:min-h-[460px]">
+              <FanMap home view={PHOENIX} />
             </div>
 
             {/* Newest pins: a swipe row on phones, a list beside the map on desktop */}
