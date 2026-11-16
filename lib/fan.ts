@@ -19,14 +19,14 @@ export interface FanVideo {
   video_url: string | null;
   posted_at: string | null;
   creator_id: string;
-  creators: (Pick<FanCreator, 'tiktok_username' | 'display_name' | 'avatar_url'> & { content_type?: string }) | null;
+  creators: (Pick<FanCreator, 'tiktok_username' | 'display_name' | 'avatar_url'> & { content_type?: string | null; content_types?: string[] | null }) | null;
 }
 
 export interface SavedVideo { savedAt: string; video: FanVideo }
 export interface FanList { id: string; name: string; videoIds: string[] }
 
 export const FAN_VIDEO_FIELDS =
-  'id, tiktok_id, place_name, category, address, lat, lng, cover_url, video_url, posted_at, creator_id, creators(tiktok_username, display_name, avatar_url, content_type)';
+  'id, tiktok_id, place_name, category, address, lat, lng, cover_url, video_url, posted_at, creator_id, creators(*)';
 
 const CAT_LABELS: Record<string, string> = { soulfood: 'Soul Food', bbq: 'BBQ', cafe: 'Café' };
 export const catLabel = (c: string | null) => (c ? CAT_LABELS[c] ?? c.charAt(0).toUpperCase() + c.slice(1) : '');

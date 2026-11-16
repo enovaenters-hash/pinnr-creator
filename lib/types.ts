@@ -5,8 +5,10 @@ export interface Creator {
   avatar_url: string | null;
   last_synced_at: string | null;
   created_at: string;
-  /** What the creator posts about; fans filter Discover by it. */
-  content_type?: string;
+  /** What the creator posts about (one or several); fans filter Discover by it. */
+  content_types?: string[] | null;
+  /** Older single-type column, kept in sync with the first of content_types. */
+  content_type?: string | null;
 }
 
 /** Content types a creator can attach to their feed. */
@@ -17,6 +19,14 @@ export const CONTENT_TYPES = [
   { key: 'events', label: 'Events' },
   { key: 'other', label: 'Other' },
 ] as const;
+
+/** A creator's content types as a clean list: newest column first, then the old single column, else Food. */
+export function creatorTypes(c: { content_types?: string[] | null; content_type?: string | null } | null | undefined): string[] {
+  const valid = new Set<string>(CONTENT_TYPES.map((t) => t.key));
+  const list = (c?.content_types?.length ? c.content_types : c?.content_type ? [c.content_type] : ['food'])
+    .filter((t) => valid.has(t));
+  return list.length ? list : ['food'];
+}
 
 export interface Video {
   id: string;
