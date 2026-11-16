@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getRequestUser } from '@/lib/supabase';
 import { geocode, sleep, type GeoResult } from '@/lib/geocode';
-import { geocodeCandidates } from '@/lib/tiktok';
+import { geocodeCandidates } from '@/lib/location';
 import { CATEGORIES } from '@/lib/types';
 
 const MAX_FEATURED = 3;
