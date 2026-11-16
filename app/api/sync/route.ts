@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getRequestUser } from '@/lib/supabase';
-import { fetchLatestVideos, extractLocation, guessCategory, geocodeCandidates, looksLikeSentence } from '@/lib/tiktok';
+import { extractLocation, guessCategory, geocodeCandidates, looksLikeSentence } from '@/lib/location';
+import { getProvider } from '@/lib/platforms';
+import type { RawVideo } from '@/lib/platforms/types';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
+import { freshAccessToken } from '@/lib/connect';
 import { geocode, sleep, type GeoResult } from '@/lib/geocode';
 
 export const maxDuration = 60;
@@ -22,11 +26,22 @@ export async function POST(request: Request) {
     .from('creators').select('id, tiktok_username, display_name').eq('id', user.id).single();
   if (!creator) return NextResponse.json({ error: 'Creator profile not found.' }, { status: 404 });
 
-  let latest;
+  // Today every creator syncs from TikTok; another platform plugs in here via getProvider().
+  const provider = getProvider('tiktok')!;
+  let latest: RawVideo[];
   try {
-    latest = await fetchLatestVideos(creator.tiktok_username, 20);
+    latest = await provider.fetchLatest(creator.tiktok_username, 20);
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 502 });
+    // The no-login source failed. If this creator connected their account, fall back to the
+    // official API (no location tags and shorter captions, but better than nothing).
+    const admin = getSupabaseAdmin();
+    const token = admin && provider.oauth ? await freshAccessToken(admin, creator.id, provider) : null;
+    if (!token || !provider.oauth) return NextResponse.json({ error: (e as Error).message }, { status: 502 });
+    try {
+      latest = await provider.oauth.fetchOwnVideos(token, creator.tiktok_username, 20);
+    } catch {
+      return NextResponse.json({ error: (e as Error).message }, { status: 502 });
+    }
   }
 
   const { data: existing } = await supabase
