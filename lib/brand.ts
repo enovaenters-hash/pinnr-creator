@@ -12,3 +12,9 @@ export function pinSvg(size: number, fill = ICE, cut = '#ffffff', stroke = INK) 
     + `<path d="${PIN_PATH}" fill="${fill}" stroke="${stroke}" stroke-width="2.5" stroke-linejoin="round"/>`
     + `<path d="${PLAY_PATH}" fill="${cut}"/></svg>`;
 }
+
+/**
+ * Where people can write to us about privacy or their data. Leave empty until there is a real
+ * inbox; the Privacy and Terms pages only show a contact line once this is filled in.
+ */
+export const CONTACT_EMAIL = '';
