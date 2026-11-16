@@ -8,7 +8,7 @@ import type { MapPin } from '@/components/Map';
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
 export type PublicVideo = Video & {
-  creators?: { tiktok_username: string; display_name?: string | null; avatar_url?: string | null } | null;
+  creators?: { tiktok_username: string; display_name?: string | null; avatar_url?: string | null; content_type?: string | null; content_types?: string[] | null } | null;
 };
 
 /**
