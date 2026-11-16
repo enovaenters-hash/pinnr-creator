@@ -9,6 +9,7 @@ import SpotCard from '@/components/SpotCard';
 import SiteNav from '@/components/SiteNav';
 
 type NewCreator = Creator & { spots: number };
+type Stats = { creators: number | null; fans: number | null; locations: number | null };
 
 const VIDEO_FIELDS = '*, creators(tiktok_username, display_name, avatar_url)';
 
@@ -17,10 +18,21 @@ export default function Home() {
   const [featured, setFeatured] = useState<PublicVideo[] | null>(null);
   const [newPovs, setNewPovs] = useState<PublicVideo[] | null>(null);
   const [newCreators, setNewCreators] = useState<NewCreator[] | null>(null);
+  const [stats, setStats] = useState<Stats>({ creators: null, fans: null, locations: null });
 
   useEffect(() => {
     if (!supabaseConfigured) return;
     const supabase = getSupabase();
+
+    // Site totals. Creators and locations can be counted straight away; fans (accounts that aren't
+    // creators) come from the site_stats() function, which also refreshes all three together.
+    supabase.from('creators').select('id', { count: 'exact', head: true })
+      .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, creators: count })); });
+    supabase.from('videos').select('id', { count: 'exact', head: true }).eq('hidden', false).not('lat', 'is', null)
+      .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, locations: count })); });
+    supabase.rpc('site_stats').then(({ data, error }) => {
+      if (!error && data) setStats({ creators: data.creators ?? null, fans: data.fans ?? null, locations: data.locations ?? null });
+    });
 
     supabase.from('featured_locations').select(`slot, video:videos(${VIDEO_FIELDS})`).order('slot')
       .then(({ data }) => setFeatured(
@@ -52,15 +64,23 @@ export default function Home() {
       <div className="max-w-5xl mx-auto px-4 pb-16">
         {/* Hero + view chooser */}
         <header className="pt-12 pb-6">
-          <p className="text-sm font-bold text-gray-500">Spots from creators you watch</p>
-          <h1 className="font-display text-5xl sm:text-6xl font-bold tracking-tight leading-[1.02] mt-2">
-            See the POV.<br /><span className="text-glacier">Then go.</span>
+          {/* Row 1: the tagline, always on a single line */}
+          <h1 className="font-display font-bold tracking-tight leading-[1.05] whitespace-nowrap text-[clamp(1.4rem,6.4vw,3.75rem)]">
+            Map It. Tap It. <span className="text-glacier">Live It.</span>
           </h1>
-          <p className="text-gray-600 mt-4 max-w-md">Every spot your favorite creators post about, on one map. Tap a pin, watch the video, get directions.</p>
+          {/* Row 2 */}
+          <p className="text-gray-600 mt-3 max-w-xl">A real map of your favorite creators&apos; stops. Tap a pin, watch the video, get directions.</p>
+          {/* Row 3 */}
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/map" className="btn-sun px-6 py-3">Explore the map</Link>
             <Link href="/dashboard" className="btn-ghost px-6 py-3">I&apos;m a creator</Link>
           </div>
+          {/* Row 4: site totals */}
+          <dl className="mt-7 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl">
+            <Stat label="Total Creators" value={stats.creators} />
+            <Stat label="Total Fans" value={stats.fans} />
+            <Stat label="Total Locations" value={stats.locations} />
+          </dl>
         </header>
 
         <Section title="Featured Locations" items={featured} empty="No featured spots yet.">
@@ -116,6 +136,15 @@ function Section({ title, items, empty, moreHref, children }: {
       {items?.length === 0 && <p className="text-sm text-gray-500">{empty}</p>}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{children}</div>
     </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="card px-2 py-3 sm:px-4 sm:py-4 text-center">
+      <dd className="font-display text-2xl sm:text-4xl font-bold leading-none text-ink">{value === null ? '—' : value.toLocaleString()}</dd>
+      <dt className="mt-1.5 text-[10px] sm:text-xs font-extrabold uppercase tracking-wide text-gray-500">{label}</dt>
+    </div>
   );
 }
 
