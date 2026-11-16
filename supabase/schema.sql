@@ -303,3 +303,18 @@ create table if not exists public.creator_verified (
 alter table public.creator_verified enable row level security;
 drop policy if exists "verified is public" on public.creator_verified;
 create policy "verified is public" on public.creator_verified for select using (true);
+
+-- "fans" = accounts that aren't creators.
+create or replace function public.site_stats()
+returns json
+language sql
+stable
+security definer set search_path = public, auth
+as $$
+  select json_build_object(
+    'creators',  (select count(*) from public.creators),
+    'fans',      (select count(*) from auth.users u where not exists (select 1 from public.creators c where c.id = u.id)),
+    'locations', (select count(*) from public.videos where hidden = false and lat is not null)
+  );
+$$;
+grant execute on function public.site_stats() to anon, authenticated;
