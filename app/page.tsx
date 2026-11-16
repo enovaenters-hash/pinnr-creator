@@ -69,13 +69,11 @@ export default function Home() {
             Map It. Tap It. <span className="text-glacier">Live It.</span>
           </h1>
           {/* Row 2 */}
-          <p className="text-gray-600 mt-3 max-w-xl">A real map of your favorite creators&apos; stops. Tap a pin, watch the video, get directions.</p>
-          {/* Row 3 */}
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/map" className="btn-sun px-6 py-3">Explore the map</Link>
             <Link href="/dashboard" className="btn-ghost px-6 py-3">I&apos;m a creator</Link>
           </div>
-          {/* Row 4: site totals */}
+          {/* Row 3: site totals */}
           <dl className="mt-7 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl">
             <Stat label="Total Creators" value={stats.creators} />
             <Stat label="Total Fans" value={stats.fans} />
