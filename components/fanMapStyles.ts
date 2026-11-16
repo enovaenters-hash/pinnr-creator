@@ -180,4 +180,11 @@ export const FAN_CSS = `
     #pub.page .pubright{display:flex;position:fixed;inset:0;z-index:1400;width:100%;min-width:0;height:100%;transform:translateY(100%);transition:transform .3s ease}
     #pub.page .pubright.show{transform:translateY(0)}
   }
+
+  /* Home page: only the map and its video panel; the bar, search and list are hidden. */
+  #pub.page.home{height:100%}
+  #pub.page.home .pagewrap{padding:0;max-width:none;height:100%}
+  #pub.page.home .pubbar,#pub.page.home .publist{display:none}
+  #pub.page.home .pubmain{height:100%;min-height:0;max-height:none;position:relative}
+  @media(min-width:761px){#pub.page.home .pubright{position:absolute;right:0;top:0;bottom:0;width:340px;min-width:340px;z-index:900}}
 `;

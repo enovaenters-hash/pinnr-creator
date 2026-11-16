@@ -84,7 +84,13 @@ function groupPlaces(rows: Row[]): { places: Place[]; creators: CreatorInfo[] } 
  * only `initialCreator`'s spots are shown, and other parts of the page can open a spot by firing
  * `window.dispatchEvent(new CustomEvent('povgo:focus', { detail: { id: <video id>, play: true } }))`.
  */
-export default function FanMap({ initialCreator = null, embedded = false }: { initialCreator?: string | null; embedded?: boolean }) {
+export default function FanMap({ initialCreator = null, embedded = false, home = false, view = null }: {
+  initialCreator?: string | null; embedded?: boolean;
+  /** Home-page map: just the map and its video panel (no bar, search or list), same pins and behaviour as /map. */
+  home?: boolean;
+  /** Fixed starting view (e.g. Phoenix) instead of fitting every pin. */
+  view?: { center: [number, number]; zoom: number } | null;
+}) {
   useEffect(() => {
     if (!supabaseConfigured) return;
     let disposed = false;
@@ -184,6 +190,17 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
         if (i >= 0 && pubMarkers[i]) pubMarkers[i].setIcon(pin(PUBSET[i].videos.length, true)).setZIndexOffset(1000);
       }
 
+      // On the home page the video panel floats over the right of the map, so aim the pin at the visible part.
+      function fly(lat: number, lon: number) {
+        if (!pubmap) return;
+        let target: Leaflet.LatLngExpression = [lat, lon];
+        if (home && window.innerWidth > 760 && $('pubRight').classList.contains('show')) {
+          const pt = pubmap.project([lat, lon], 14); pt.x += 170;
+          target = pubmap.unproject(pt, 14);
+        }
+        pubmap.flyTo(target, 14, { duration: 0.5 });
+      }
+
       function showPub() {
         if (!pubmap) {
           pubmap = L.map('pubmap', { zoomControl: true, scrollWheelZoom: false });
@@ -232,7 +249,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
         renderPubVideo(g);
         // Picked from the list further down the page: scroll back up to the map and video.
         if (pageMode && fromList) document.querySelector('#pub .pubmain')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        pubmap?.flyTo([p.lat, p.lon], 14, { duration: 0.5 });
+        fly(p.lat, p.lon);
       }
 
       function buildCreatorVideoList(creator: string) {
@@ -250,7 +267,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
         const p = allCreatorLocations[gIdx];
         pubVidP = p;
         curVid = v;
-        pubmap?.flyTo([p.lat, p.lon], 14, { duration: 0.5 });
+        fly(p.lat, p.lon);
         const nextIdx = (gIdx + 1) % total, prevIdx = (gIdx - 1 + total) % total;
         const clipnav = total > 1 ? `<div class="clipnav">
             <span class="clippos">${gIdx + 1}/${total}</span>
@@ -378,7 +395,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
         if (t.dataset.g !== undefined) { renderPubVideo(Number(t.dataset.g)); return; }
         if (t.dataset.act === 'back') {
           stopPlayer();
-          if (pubVidP) pubmap?.flyTo([pubVidP.lat, pubVidP.lon], 14, { duration: 0.5 });
+          if (pubVidP) fly(pubVidP.lat, pubVidP.lon);
           $('pubRight').classList.remove('show');
           pubmap?.invalidateSize();
         }
@@ -426,7 +443,8 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
           if (showPin) { shown++; pts.push([p.lat, p.lon]); }
         });
         $('pubCount').textContent = `${shown} place${shown === 1 ? '' : 's'}`;
-        if (fit) {
+        if (fit && view) pubmap!.setView(view.center, view.zoom);
+        else if (fit) {
           if (pts.length === 1) pubmap!.setView(pts[0], 13);
           else if (pts.length) pubmap!.fitBounds(L.latLngBounds(pts).pad(0.2));
           else pubmap!.setView([39.5, -98.35], 4);
@@ -468,7 +486,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
       if (onFocus) window.removeEventListener('povgo:focus', onFocus);
       pubmap?.remove(); pubmap = null;
     };
-  }, [initialCreator, embedded]);
+  }, [initialCreator, embedded, home, view]);
 
   if (!supabaseConfigured) return <p className="p-6 text-sm">Supabase isn&apos;t connected yet.</p>;
 
@@ -477,8 +495,8 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
     return (
       <>
         <style>{FAN_CSS}</style>
-        <SiteNav active="map" />
-        <div id="pub" className="page">
+        {!home && <SiteNav active="map" />}
+        <div id="pub" className={home ? 'page home' : 'page'}>
           <div className="pagewrap">
             <div className="pubbar">
               <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
