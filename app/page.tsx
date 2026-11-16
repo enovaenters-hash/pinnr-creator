@@ -6,7 +6,8 @@ import dynamic from 'next/dynamic';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import type { Creator } from '@/lib/types';
 import type { PublicVideo } from '@/components/PublicMap';
-import SpotCard from '@/components/SpotCard';
+import PosterTile from '@/components/PosterTile';
+import ExploreVideos from '@/components/ExploreVideos';
 import SiteNav from '@/components/SiteNav';
 import { categoryColor } from '@/lib/types';
 import type { MapPin } from '@/components/Map';
@@ -19,6 +20,10 @@ type NewCreator = Creator & { spots: number };
 type Stats = { creators: number | null; fans: number | null; locations: number | null };
 
 const VIDEO_FIELDS = '*, creators(tiktok_username, display_name, avatar_url)';
+// The map + Explore grid also need each creator's content types. content_types only exists once multi-types.sql
+// has been run, so fall back to the older single column rather than lose the map.
+const VIDEO_FIELDS_TYPES = '*, creators(tiktok_username, display_name, avatar_url, content_type, content_types)';
+const VIDEO_FIELDS_TYPES_OLD = '*, creators(tiktok_username, display_name, avatar_url, content_type)';
 
 /** Home screen: choose a view, plus Featured Locations, New POVs and New Creators. */
 export default function Home() {
@@ -42,8 +47,12 @@ export default function Home() {
       if (!error && data) setStats({ creators: data.creators ?? null, fans: data.fans ?? null, locations: data.locations ?? null });
     });
 
-    supabase.from('videos').select(VIDEO_FIELDS).eq('hidden', false).not('lat', 'is', null).limit(1000)
-      .then(({ data }) => setMapVideos((data as PublicVideo[]) ?? []));
+    const loadAll = (fields: string) => supabase.from('videos').select(fields).eq('hidden', false).not('lat', 'is', null)
+      .order('created_at', { ascending: false }).order('posted_at', { ascending: false }).limit(1000);
+    loadAll(VIDEO_FIELDS_TYPES).then(async ({ data, error }) => {
+      if (error) ({ data } = await loadAll(VIDEO_FIELDS_TYPES_OLD));
+      setMapVideos((data as unknown as PublicVideo[]) ?? []);
+    });
 
     supabase.from('featured_locations').select(`slot, video:videos(${VIDEO_FIELDS})`).order('slot')
       .then(({ data }) => setFeatured(
@@ -116,10 +125,22 @@ export default function Home() {
           </div>
         </header>
 
-        <div id="explore" className="scroll-mt-4" />
-        <Section title="Featured Locations" items={featured} empty="No featured spots yet.">
-          {featured?.map((v, i) => <SpotCard key={v.id} video={v} badge={`★ Featured #${i + 1}`} />)}
-        </Section>
+        {/* POVGo Featured: the 3 featured slots, always on one line */}
+        <section id="explore" className="mt-10 scroll-mt-4">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-2xl font-semibold">POVGo Featured</h2>
+            <Link href="/map" className="text-sm font-bold text-glacier hover:underline">See on map →</Link>
+          </div>
+          {featured === null && (
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+              {[0, 1, 2].map((i) => <div key={i} className="rounded-2xl bg-white animate-pulse aspect-[4/5] sm:aspect-[4/3]" />)}
+            </div>
+          )}
+          {featured?.length === 0 && <p className="text-sm text-gray-500">No featured spots yet.</p>}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            {featured?.slice(0, 3).map((v, i) => <PosterTile key={v.id} video={v} rank={i + 1} />)}
+          </div>
+        </section>
 
         <section className="mt-10">
           <h2 className="text-2xl font-semibold mb-3">New Creators</h2>
@@ -141,6 +162,8 @@ export default function Home() {
           </ul>
         </section>
 
+        <ExploreVideos videos={mapVideos} />
+
         <footer className="mt-16 pt-6 border-t border-gray-200 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-semibold text-gray-500">
           <Link href="/signup" className="hover:text-ink">Become a creator</Link>
           <Link href="/privacy" className="hover:text-ink">Privacy Policy</Link>
@@ -150,22 +173,6 @@ export default function Home() {
       </div>
     </main>
     </>
-  );
-}
-
-function Section({ title, items, empty, moreHref, children }: {
-  title: string; items: unknown[] | null; empty: string; moreHref?: string; children: React.ReactNode;
-}) {
-  return (
-    <section className="mt-10">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-2xl font-semibold">{title}</h2>
-        {moreHref && <Link href={moreHref} className="text-sm font-bold text-glacier hover:underline">See all →</Link>}
-      </div>
-      {items === null && <Skeleton />}
-      {items?.length === 0 && <p className="text-sm text-gray-500">{empty}</p>}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{children}</div>
-    </section>
   );
 }
 
