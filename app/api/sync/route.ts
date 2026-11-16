@@ -30,14 +30,20 @@ export async function POST(request: Request) {
   }
 
   const { data: existing } = await supabase
-    .from('videos').select('id, tiktok_id').eq('creator_id', creator.id);
+    .from('videos').select('id, tiktok_id, lat, place_name, address').eq('creator_id', creator.id);
   const seen = new Map((existing ?? []).map((r) => [r.tiktok_id as string, r.id as string]));
+  const existingByTid = new Map((existing ?? []).map((r) => [r.tiktok_id as string, r]));
 
-  // 1) Insert only videos we haven't stored yet.
+  // 1) Insert only videos we haven't stored yet. A TikTok location tag (name, address and
+  //    coordinates, straight from TikTok) beats guessing from the caption, and needs no geocoding.
   const fresh = latest.filter((v) => !seen.has(v.tiktokId));
+  let tagged = 0;
   if (fresh.length) {
     const rows = fresh.map((v) => {
       const loc = extractLocation(v.caption);
+      const poi = v.poi;
+      const placed = poi !== null && poi.lat !== null && poi.lng !== null;
+      if (placed) tagged++;
       return {
         creator_id: creator.id,
         tiktok_id: v.tiktokId,
@@ -45,9 +51,12 @@ export async function POST(request: Request) {
         cover_url: v.coverUrl,
         video_url: v.videoUrl,
         posted_at: v.postedAt,
-        place_name: loc?.placeName || null,
-        address: loc?.address ?? null,
-        category: guessCategory(`${v.caption} ${loc?.placeName ?? ''}`),
+        place_name: poi?.name || loc?.placeName || null,
+        address: poi?.address ?? loc?.address ?? null,
+        lat: placed ? poi.lat : null,
+        lng: placed ? poi.lng : null,
+        geocode_attempted: placed,
+        category: guessCategory(`${v.caption} ${poi?.name ?? loc?.placeName ?? ''} ${poi?.kind ?? ''}`),
       };
     });
     const { error } = await supabase
@@ -58,6 +67,21 @@ export async function POST(request: Request) {
   // 2) Refresh cover images on videos we already had.
   await Promise.all(latest.filter((v) => seen.has(v.tiktokId) && v.coverUrl).map((v) =>
     supabase.from('videos').update({ cover_url: v.coverUrl }).eq('id', seen.get(v.tiktokId)!)));
+
+  // 2b) Videos stored before location tags were read: if one has no pin yet but carries a
+  //     tag, place it now. Videos that already have a pin (including creator edits) are left alone.
+  await Promise.all(latest.map(async (v) => {
+    const row = existingByTid.get(v.tiktokId);
+    const poi = v.poi;
+    if (!row || !poi || poi.lat === null || poi.lng === null || row.lat !== null) return;
+    const keepName = row.place_name && !looksLikeSentence(row.place_name);
+    const { error } = await supabase.from('videos').update({
+      place_name: keepName ? row.place_name : poi.name,
+      address: poi.address ?? row.address,
+      lat: poi.lat, lng: poi.lng, geocode_attempted: true,
+    }).eq('id', row.id);
+    if (!error) tagged++;
+  }));
 
   // 3) Repair older auto-filled data with the current caption parser: sentence-y place
   //    names, missing addresses and missing categories. Creator edits are left alone
@@ -125,6 +149,7 @@ export async function POST(request: Request) {
     checked: latest.length,
     added: fresh.length,
     mapped,
+    tagged, // placed straight from TikTok location tags
     repaired,
     pending: (pending?.length ?? 0) - processed, // still to locate on the next sync
   });
