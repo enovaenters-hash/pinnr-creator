@@ -2,6 +2,7 @@
 
 import { supabaseConfigured } from '@/lib/supabase';
 import SiteNav from '@/components/SiteNav';
+import SiteFooter from '@/components/SiteFooter';
 
 export function AuthCard({
   title, subtitle, children, footer,
@@ -19,6 +20,7 @@ export function AuthCard({
         <p className="text-center text-sm text-gray-500 mt-4">{footer}</p>
       </div>
     </main>
+    <SiteFooter />
     </>
   );
 }

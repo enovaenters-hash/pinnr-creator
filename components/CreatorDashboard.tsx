@@ -7,6 +7,7 @@ import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import { categoryColor, CONTENT_TYPES, creatorTypes, type Creator, type Video } from '@/lib/types';
 import { api } from '@/lib/api';
 import VideoEditForm from '@/components/VideoEditForm';
+import ConnectedAccounts from '@/components/ConnectedAccounts';
 import { NotConfigured, inputClass, primaryBtn } from '@/components/AuthCard';
 import SiteNav from '@/components/SiteNav';
 import type { MapPin } from '@/components/Map';
@@ -172,6 +173,7 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
               })}
             </div>
           </div>
+          <ConnectedAccounts onMessage={(text, tone) => setStatus({ text, tone })} onChanged={load} />
           {status && (
             <p className={`mt-3 text-sm ${status.tone === 'err' ? 'text-red-600' : status.tone === 'ok' ? 'text-green-700' : 'text-gray-600'}`}>
               {status.text}
