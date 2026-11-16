@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
-import { categoryColor, CONTENT_TYPES, type Creator, type Video } from '@/lib/types';
+import { categoryColor, CONTENT_TYPES, creatorTypes, type Creator, type Video } from '@/lib/types';
 import { api } from '@/lib/api';
 import VideoEditForm from '@/components/VideoEditForm';
 import { NotConfigured, inputClass, primaryBtn } from '@/components/AuthCard';
@@ -81,13 +81,20 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
     }
   }
 
-  async function setType(type: string) {
-    if (!creator || creator.content_type === type) return;
+  /** Tap a type to add or remove it. At least one stays selected. */
+  async function toggleType(type: string) {
+    if (!creator) return;
+    const now = creatorTypes(creator);
+    const next = now.includes(type) ? now.filter((t) => t !== type) : [...now, type];
+    if (next.length === 0) { setStatus({ text: 'Keep at least one content type selected.', tone: 'info' }); return; }
+    // Keep them in the same order as the buttons so the list is tidy.
+    const ordered = CONTENT_TYPES.map((t) => t.key as string).filter((k) => next.includes(k));
     const before = creator;
-    setCreator({ ...creator, content_type: type });
-    const { error } = await getSupabase().from('creators').update({ content_type: type }).eq('id', creator.id);
-    if (error) { setCreator(before); setStatus({ text: 'Couldn’t save your content type. Try again.', tone: 'err' }); }
-    else setStatus({ text: 'Content type saved', tone: 'ok' });
+    setCreator({ ...creator, content_types: ordered, content_type: ordered[0] });
+    const { error } = await getSupabase().from('creators')
+      .update({ content_types: ordered, content_type: ordered[0] }).eq('id', creator.id);
+    if (error) { setCreator(before); setStatus({ text: 'Couldn’t save your content types. Try again.', tone: 'err' }); }
+    else setStatus({ text: 'Content types saved', tone: 'ok' });
   }
 
   async function signOut() {
@@ -152,12 +159,12 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
               className="btn-ghost flex-1 py-2 text-sm text-center">View</a>
           </div>
           <div className="mt-4">
-            <p className="text-xs font-bold text-gray-500 mb-1.5">What do you post? Fans use this to choose what to discover.</p>
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Content type">
+            <p className="text-xs font-bold text-gray-500 mb-1.5">What do you post? Pick all that apply. Fans use this to choose what to discover.</p>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Content types">
               {CONTENT_TYPES.map((t) => {
-                const on = (creator.content_type ?? 'food') === t.key;
+                const on = creatorTypes(creator).includes(t.key);
                 return (
-                  <button key={t.key} type="button" onClick={() => setType(t.key)} aria-pressed={on}
+                  <button key={t.key} type="button" onClick={() => toggleType(t.key)} aria-pressed={on}
                     className={`px-3.5 py-1.5 text-xs font-extrabold rounded-full ${on ? 'bg-ink text-white' : 'bg-white text-ink border border-gray-200'}`}>
                     {t.label}
                   </button>

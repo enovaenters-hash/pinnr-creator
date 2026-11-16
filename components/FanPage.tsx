@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
-import { categoryColor, CONTENT_TYPES } from '@/lib/types';
+import { categoryColor, CONTENT_TYPES, creatorTypes } from '@/lib/types';
 import {
   FAN_VIDEO_FIELDS, catLabel, cityOf, formatMiles, milesBetween, timeAgo, videoHref,
   type FanCreator, type FanList, type FanVideo, type SavedVideo,
@@ -52,7 +52,7 @@ export default function FanPage() {
   const [finding, setFinding] = useState(false);
   const [notice, setNotice] = useState('');
   const [discover, setDiscover] = useState<FanVideo[] | null>(null);
-  const [dtype, setDtype] = useState<string>('all');
+  const [dtypes, setDtypes] = useState<string[]>([]); // chosen discover types; empty = All
 
   const go = useCallback((v: View) => {
     setView(v);
@@ -119,7 +119,10 @@ export default function FanPage() {
       setFinding(followed.length === 0);
       loadFeed(followed.map((x) => x.id));
       loadDiscover(followed.map((x) => x.id), id);
-      try { setDtype(localStorage.getItem('povgo-discover-type') || 'all'); } catch { /* private window */ }
+      try {
+        const saved = (localStorage.getItem('povgo-discover-type') || '').split(',').filter((k) => CONTENT_TYPES.some((t) => t.key === k));
+        setDtypes(saved);
+      } catch { /* private window */ }
       // If location was already allowed, use it straight away so "local" works without a tap.
       try {
         const perm = await navigator.permissions?.query({ name: 'geolocation' });
@@ -200,9 +203,11 @@ export default function FanPage() {
     locate(() => flash('Turn on location to sort by closest.'));
   }
 
+  /** Tap a type to add or remove it from the filter; "All" clears it. */
   function pickType(t: string) {
-    setDtype(t);
-    try { localStorage.setItem('povgo-discover-type', t); } catch { /* private window */ }
+    const next = t === 'all' ? [] : dtypes.includes(t) ? dtypes.filter((x) => x !== t) : [...dtypes, t];
+    setDtypes(next);
+    try { localStorage.setItem('povgo-discover-type', next.join(',')); } catch { /* private window */ }
   }
 
   if (!supabaseConfigured) return <main className="max-w-xl mx-auto p-6"><NotConfigured /></main>;
@@ -232,7 +237,7 @@ export default function FanPage() {
 
   // Discover: unfollowed creators, filtered by the chosen type, and by distance once location is on.
   const LOCAL_MILES = 50;
-  const typed = (discover ?? []).filter((v) => dtype === 'all' || (v.creators?.content_type ?? 'food') === dtype);
+  const typed = (discover ?? []).filter((v) => dtypes.length === 0 || creatorTypes(v.creators).some((t) => dtypes.includes(t)));
   const nearby = here ? typed.filter((v) => v.lat !== null && v.lng !== null && milesBetween(here, { lat: v.lat, lng: v.lng }) <= LOCAL_MILES) : [];
   const local = nearby.length ? nearby : typed;
   const localNote = !here ? 'everywhere for now' : nearby.length ? `within ${LOCAL_MILES} miles of you` : 'nothing new near you yet, so here’s everywhere';
@@ -338,8 +343,9 @@ export default function FanPage() {
               <div className="flex flex-wrap items-center gap-1.5 mb-3" role="group" aria-label="Choose what to discover">
                 <span className="text-xs font-extrabold text-gray-500 mr-1">Discover</span>
                 {[{ key: 'all', label: 'All' }, ...CONTENT_TYPES].map((t) => (
-                  <button key={t.key} type="button" onClick={() => pickType(t.key)} aria-pressed={dtype === t.key}
-                    className={`px-3 py-1.5 text-xs font-extrabold rounded-full ${dtype === t.key ? 'bg-ink text-white' : 'bg-white text-ink border border-gray-200'}`}>
+                  <button key={t.key} type="button" onClick={() => pickType(t.key)}
+                    aria-pressed={t.key === 'all' ? dtypes.length === 0 : dtypes.includes(t.key)}
+                    className={`px-3 py-1.5 text-xs font-extrabold rounded-full ${(t.key === 'all' ? dtypes.length === 0 : dtypes.includes(t.key)) ? 'bg-ink text-white' : 'bg-white text-ink border border-gray-200'}`}>
                     {t.label}
                   </button>
                 ))}
@@ -350,7 +356,7 @@ export default function FanPage() {
               </div>
               {discover === null && <Skeleton />}
               {discover !== null && local.length === 0 && (
-                <Empty>{dtype === 'all' ? 'No new creators to discover right now.' : 'No creators of this type yet. Try All.'}</Empty>
+                <Empty>{dtypes.length === 0 ? 'No new creators to discover right now.' : 'No creators with these types yet. Try All.'}</Empty>
               )}
               {local.length > 0 && (
                 <Scroller label="New from local creators">
