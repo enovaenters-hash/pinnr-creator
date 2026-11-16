@@ -145,4 +145,39 @@ export const FAN_CSS = `
       background:rgba(0,0,0,.7);color:#fff;border:0;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:750;cursor:pointer;backdrop-filter:blur(4px)}
     .clipnav{display:flex}
   }
+
+  /* ───── Full /map page: map card on top, then search + chips + list as a normal scrolling page ───── */
+  #pub.page{position:static;inset:auto;z-index:auto;background:transparent;display:block}
+  #pub.page .pagewrap{max-width:1024px;margin:0 auto;padding:14px 16px 64px}
+  #pub.page .pubbar{background:none;padding:0 0 12px;gap:10px;flex-wrap:nowrap}
+  #pub.page .pubbar .pfp{width:40px;height:40px;background:var(--frost);border-color:var(--bar)}
+  #pub.page .pubwho{flex:1 1 0;min-width:0}
+  #pub.page .pubwho .nm{font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #pub.page .pubwho .h{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #pub.page .pubbar .pubsel{max-width:42vw;box-shadow:inset 0 0 0 2px var(--line)}
+  #pub.page .pubmain{display:flex;flex-direction:row;height:min(66vh,640px);min-height:340px;border-radius:24px;overflow:hidden;box-shadow:0 8px 24px rgba(19,41,58,.12);background:#fff;scroll-margin-top:12px}
+  #pub.page #pubmap{position:relative;inset:auto;flex:1;min-width:0;height:auto}
+  #pub.page .pubright{display:none;position:relative;inset:auto;transform:none;width:390px;min-width:390px;height:auto;z-index:auto}
+  #pub.page .pubright.show{display:flex}
+  #pub.page .mback{display:inline-flex;align-items:center;gap:5px;position:absolute;top:12px;right:60px;z-index:20;background:rgba(0,0,0,.7);color:#fff;border:0;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:750;cursor:pointer;backdrop-filter:blur(4px)}
+  #pub.page .clipnav{position:absolute;top:52px;right:12px;display:flex}
+  #pub.page .publist{margin-top:18px;min-width:0}
+  #pub.page .publist .srch{padding:0 0 10px}
+  #pub.page .publist .srch input{width:100%;padding:12px 18px;border:2px solid var(--line);border-radius:999px;font-family:inherit;font-size:15px;outline:none;background:#fff}
+  #pub.page .publist .srch input:focus{border-color:var(--bar);box-shadow:0 0 0 3px var(--frost)}
+  #pub.page .pubchips-wrapper{background:none;border:0;padding:0 0 4px}
+  #pub.page .clear-btn{margin:6px 8px 6px 0}
+  #pub.page .pubchips-bar{margin-right:0;padding:6px 0}
+  #pub.page #pubCount{padding:8px 4px 6px}
+  #pub.page #pubList{overflow:visible;flex:none;display:grid;grid-template-columns:1fr;gap:10px}
+  #pub.page .pcard{background:#fff;border:2px solid transparent;border-radius:18px;box-shadow:0 6px 20px rgba(19,41,58,.07);padding:13px 16px}
+  #pub.page .pcard:hover{background:#fff;border-color:var(--bar)}
+  #pub.page .pcard.on{background:#fffbe8;border-color:var(--accent);box-shadow:0 6px 20px rgba(19,41,58,.07)}
+  @media(min-width:761px){#pub.page #pubList{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}
+  @media(max-width:760px){
+    #pub.page .pubmain{height:46vh;min-height:320px;max-height:520px}
+    /* The video still opens full screen on phones; Back returns to the map. */
+    #pub.page .pubright{display:flex;position:fixed;inset:0;z-index:1400;width:100%;min-width:0;height:100%;transform:translateY(100%);transition:transform .3s ease}
+    #pub.page .pubright.show{transform:translateY(0)}
+  }
 `;

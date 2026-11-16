@@ -9,6 +9,7 @@ import { FAN_CSS } from './fanMapStyles';
 import { pinSvg, ICE, SUN } from '@/lib/brand';
 import Logo from '@/components/Logo';
 import NavLinks from '@/components/NavLinks';
+import SiteNav from '@/components/SiteNav';
 
 /**
  * The fan map, matching the original layout (keen-lollipop-93bfb2.netlify.app):
@@ -76,6 +77,9 @@ function groupPlaces(rows: Row[]): { places: Place[]; creators: CreatorInfo[] } 
 }
 
 /**
+ * Full page (/map): the site bar, then the map as a card, then search + category chips + the place list as a normal
+ * scrolling page (no pop-up sheet). Tapping a place scrolls up to the map and opens its video.
+ *
  * embedded: render inside a page (the creator page) instead of full screen. The top bar is hidden,
  * only `initialCreator`'s spots are shown, and other parts of the page can open a spot by firing
  * `window.dispatchEvent(new CustomEvent('povgo:focus', { detail: { id: <video id>, play: true } }))`.
@@ -84,6 +88,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
   useEffect(() => {
     if (!supabaseConfigured) return;
     let disposed = false;
+    const pageMode = !embedded;
     let pubmap: Leaflet.Map | null = null;
     let onPlayerMessage: ((e: MessageEvent) => void) | null = null;
     let onFocus: ((e: Event) => void) | null = null;
@@ -181,7 +186,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
 
       function showPub() {
         if (!pubmap) {
-          pubmap = L.map('pubmap', { zoomControl: true, scrollWheelZoom: !embedded });
+          pubmap = L.map('pubmap', { zoomControl: true, scrollWheelZoom: false });
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(pubmap);
         }
         pubActive.clear(); pubQuery = ''; pubSel = -1; pubVidP = null;
@@ -212,18 +217,21 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
         setTimeout(() => { pubmap!.invalidateSize(); applyPubFilter(true); }, 60);
       }
 
-      function selectPub(i: number, dbId?: string) {
+      function selectPub(i: number, dbId?: string, fromList?: boolean) {
         pubSel = i; const p = PUBSET[i];
         lightMarker(i);
         [...$('pubList').children].forEach((x) => x.classList.toggle('on', Number((x as HTMLElement).dataset.i) === i));
-        $('pubList').querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+        if (!pageMode) $('pubList').querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
         pubVidP = p;
         buildCreatorVideoList(p.creator);
         let g = allCreatorLocations.findIndex((loc) => loc === p);
         if (dbId) { const k = allCreatorVids.findIndex((v) => v.dbId === dbId); if (k >= 0) g = k; }
         playMode = false; // a new place starts on its cover; tap ▶ to load TikTok's player
-        renderPubVideo(g);
         $('pubRight').classList.add('show');
+        pubmap?.invalidateSize(); // the video panel changes the map's width
+        renderPubVideo(g);
+        // Picked from the list further down the page: scroll back up to the map and video.
+        if (pageMode && fromList) document.querySelector('#pub .pubmain')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         pubmap?.flyTo([p.lat, p.lon], 14, { duration: 0.5 });
       }
 
@@ -372,6 +380,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
           stopPlayer();
           if (pubVidP) pubmap?.flyTo([pubVidP.lat, pubVidP.lon], 14, { duration: 0.5 });
           $('pubRight').classList.remove('show');
+          pubmap?.invalidateSize();
         }
         if (t.dataset.act === 'save' && t.dataset.id) { toggleSave(t.dataset.id, t); return; }
         if (t.dataset.act === 'play') startPlayer();
@@ -401,7 +410,7 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
           card.innerHTML = `<h4>${esc(p.name)}</h4>
             ${combinedMode ? `<div class="by"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a></div>` : ''}
             <div class="mt"><span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}</div>`;
-          card.onclick = () => selectPub(i);
+          card.onclick = () => selectPub(i, undefined, true);
           el.appendChild(card);
         });
       }
@@ -425,8 +434,10 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
       }
 
       ($('pubSearch') as HTMLInputElement).oninput = (e) => { pubQuery = (e.target as HTMLInputElement).value.toLowerCase(); applyPubFilter(); };
-      $('sheetHandle').onclick = () => $('pubLeft').classList.toggle('expanded');
-      $('srchToggle').onclick = () => $('pubLeft').classList.toggle('expanded');
+      // Pop-up sheet controls exist only in the embedded layout.
+      const sheetHandle = document.getElementById('sheetHandle'), srchToggle = document.getElementById('srchToggle');
+      if (sheetHandle) sheetHandle.onclick = () => $('pubLeft').classList.toggle('expanded');
+      if (srchToggle) srchToggle.onclick = () => $('pubLeft').classList.toggle('expanded');
       $('clearBtn').onclick = () => {
         pubActive.clear();
         document.querySelectorAll('#pubChips .pchip').forEach((chip) => { chip.classList.remove('on'); (chip as HTMLElement).style.background = ''; });
@@ -460,6 +471,39 @@ export default function FanMap({ initialCreator = null, embedded = false }: { in
   }, [initialCreator, embedded]);
 
   if (!supabaseConfigured) return <p className="p-6 text-sm">Supabase isn&apos;t connected yet.</p>;
+
+  if (!embedded) {
+    // Full page: nav, map card (+ video panel), then search, chips and the scrolling list.
+    return (
+      <>
+        <style>{FAN_CSS}</style>
+        <SiteNav active="map" />
+        <div id="pub" className="page">
+          <div className="pagewrap">
+            <div className="pubbar">
+              <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
+              <div className="pubwho"><div className="nm" id="pubName">All Spots</div><div className="h" id="pubHandle">Loading…</div></div>
+              <a className="pubview" id="pubView" href="/map" hidden>View page</a>
+              <select className="pubsel" id="pubCreator" aria-label="Choose creator"><option>All creators</option></select>
+            </div>
+            <div className="pubmain">
+              <div id="pubmap"><div className="pubload" id="pubLoading">Loading map…</div></div>
+              <aside className="pubright" id="pubRight" />
+            </div>
+            <section className="publist" id="pubLeft" aria-label="Places">
+              <div className="srch"><input id="pubSearch" type="search" placeholder="Search places…" autoComplete="off" /></div>
+              <div className="pubchips-wrapper">
+                <button className="pchip clear-btn" id="clearBtn">✕ Clear Search</button>
+                <div className="pubchips-bar" id="pubChips" />
+              </div>
+              <div id="pubCount" />
+              <div id="pubList" />
+            </section>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
