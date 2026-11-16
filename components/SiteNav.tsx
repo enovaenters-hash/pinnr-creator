@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Logo from '@/components/Logo';
 import NavLinks, { type NavActive } from '@/components/NavLinks';
 
-/** Ice-blue POVGo top bar: logo and Home · Map · Login on one line, shared by every page. */
+/** Ice-blue POVGo top bar: logo and Home · Explore · Map · Login on one line, shared by every page. */
 export default function SiteNav({ active }: { active?: NavActive }) {
   return (
     <div className="bg-ice text-ink relative z-[1100]">

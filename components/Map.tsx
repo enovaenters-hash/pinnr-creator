@@ -23,14 +23,23 @@ const esc = (s: string) =>
 const safeUrl = (u?: string | null) => (u && /^https:\/\//i.test(u) ? esc(u) : null);
 
 /** focusId: zoom to that pin and open its popup (e.g. from a home-screen card). */
-export default function Map({ pins, focusId }: { pins: MapPin[]; focusId?: string | null }) {
+export default function Map({ pins, focusId, view, preview }: {
+  pins: MapPin[]; focusId?: string | null;
+  /** Fixed starting view (instead of fitting every pin), e.g. Phoenix on the home page. */
+  view?: { center: [number, number]; zoom: number } | null;
+  /** Home-page preview: no scroll-wheel zoom, and no one-finger drag on phones so the page still scrolls. */
+  preview?: boolean;
+}) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
     if (!el.current || map.current) return;
-    map.current = L.map(el.current, { zoomControl: true }).setView([39.5, -98.35], 4);
+    map.current = L.map(el.current, {
+      zoomControl: true,
+      ...(preview ? { scrollWheelZoom: false, dragging: !L.Browser.mobile } : {}),
+    }).setView([39.5, -98.35], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 19,
@@ -69,11 +78,13 @@ export default function Map({ pins, focusId }: { pins: MapPin[]; focusId?: strin
     if (focused) {
       map.current.setView(focused.marker.getLatLng(), 15);
       focused.marker.openPopup();
+    } else if (view) {
+      map.current.setView(view.center, view.zoom);
     } else if (markers.length) {
       const bounds = L.featureGroup(markers.map((m) => m.marker)).getBounds();
       map.current.fitBounds(bounds.pad(0.2), { maxZoom: 14 });
     }
-  }, [pins, focusId]);
+  }, [pins, focusId, view]);
 
   return <div ref={el} className="w-full h-full" style={{ minHeight: 280 }} />;
 }

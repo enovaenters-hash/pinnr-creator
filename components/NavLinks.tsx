@@ -9,7 +9,7 @@ const pill = 'whitespace-nowrap rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2 text-
 const on = 'bg-white shadow-sm';
 const off = 'opacity-85 hover:bg-white/40 hover:opacity-100';
 
-/** Home · Map · Login ▾ (Fan / Creator). Shared by the site bar and the fan map bar. */
+/** Home · Explore · Map · Login ▾ (Fan / Creator). Shared by the site bar and the fan map bar. */
 export default function NavLinks({ active, className = '' }: { active?: NavActive; className?: string }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -30,7 +30,8 @@ export default function NavLinks({ active, className = '' }: { active?: NavActiv
 
   return (
     <nav aria-label="Main" className={`flex items-center gap-0.5 sm:gap-1.5 ${className}`}>
-      <Link href="/" aria-current={active === 'home' ? 'page' : undefined} className={`${pill} ${active === 'home' ? on : off}`}>Home</Link>
+      <Link href="/" aria-current={active === 'home' ? 'page' : undefined} className={`${pill} hidden sm:inline-block ${active === 'home' ? on : off}`}>Home</Link>
+      <Link href="/#explore" className={`${pill} ${off}`}>Explore</Link>
       <Link href="/map" aria-current={active === 'map' ? 'page' : undefined} className={`${pill} ${active === 'map' ? on : off}`}>Map</Link>
       <div ref={box} className="relative z-[1300]">
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu"
