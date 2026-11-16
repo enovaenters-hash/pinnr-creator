@@ -2,11 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import type { Creator } from '@/lib/types';
 import type { PublicVideo } from '@/components/PublicMap';
 import SpotCard from '@/components/SpotCard';
 import SiteNav from '@/components/SiteNav';
+import { categoryColor } from '@/lib/types';
+import type { MapPin } from '@/components/Map';
+
+// The home map is a Phoenix preview; the full map lives at /map.
+const Map = dynamic(() => import('@/components/Map'), { ssr: false });
+const PHOENIX = { center: [33.4484, -112.074] as [number, number], zoom: 10 };
 
 type NewCreator = Creator & { spots: number };
 type Stats = { creators: number | null; fans: number | null; locations: number | null };
@@ -18,6 +25,7 @@ export default function Home() {
   const [featured, setFeatured] = useState<PublicVideo[] | null>(null);
   const [newPovs, setNewPovs] = useState<PublicVideo[] | null>(null);
   const [newCreators, setNewCreators] = useState<NewCreator[] | null>(null);
+  const [mapVideos, setMapVideos] = useState<PublicVideo[] | null>(null);
   const [stats, setStats] = useState<Stats>({ creators: null, fans: null, locations: null });
 
   useEffect(() => {
@@ -33,6 +41,9 @@ export default function Home() {
     supabase.rpc('site_stats').then(({ data, error }) => {
       if (!error && data) setStats({ creators: data.creators ?? null, fans: data.fans ?? null, locations: data.locations ?? null });
     });
+
+    supabase.from('videos').select(VIDEO_FIELDS).eq('hidden', false).not('lat', 'is', null).limit(1000)
+      .then(({ data }) => setMapVideos((data as PublicVideo[]) ?? []));
 
     supabase.from('featured_locations').select(`slot, video:videos(${VIDEO_FIELDS})`).order('slot')
       .then(({ data }) => setFeatured(
@@ -57,36 +68,57 @@ export default function Home() {
     })();
   }, []);
 
+  const pins: MapPin[] = (mapVideos ?? []).map((v) => ({
+    id: v.id, lat: v.lat!, lng: v.lng!, title: v.place_name || 'Spot',
+    subtitle: [v.creators ? `@${v.creators.tiktok_username}` : null, v.address].filter(Boolean).join(' · '),
+    cover: v.cover_url, href: v.video_url, color: categoryColor(v.category),
+  }));
+
   return (
     <>
     <SiteNav active="home" />
     <main className="flex-1 bg-cloud text-ink">
       <div className="max-w-5xl mx-auto px-4 pb-16">
-        {/* Hero + view chooser */}
-        <header className="pt-12 pb-6">
-          {/* Row 1: the tagline, always on a single line */}
+        {/* Hero: tagline, then stats + Phoenix map + newest pins */}
+        <header className="pt-8 sm:pt-12 pb-2">
           <h1 className="font-display font-bold tracking-tight leading-[1.05] whitespace-nowrap text-[clamp(1.4rem,6.4vw,3.75rem)]">
             Map It. Tap It. <span className="text-glacier">Live It.</span>
           </h1>
-          {/* Row 2 */}
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/map" className="btn-sun px-6 py-3">Explore the map</Link>
-            <Link href="/dashboard" className="btn-ghost px-6 py-3">I&apos;m a creator</Link>
+
+          <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-x-6">
+            {/* Stats: one strip on phones, stacked rows on desktop */}
+            <dl className="card grid grid-cols-3 divide-x-2 divide-gray-100 lg:col-start-2 lg:row-start-1 lg:grid-cols-1 lg:divide-x-0 lg:divide-y-2 self-start">
+              <Stat label="Total Creators" value={stats.creators} />
+              <Stat label="Total Fans" value={stats.fans} />
+              <Stat label="Total Locations" value={stats.locations} />
+            </dl>
+
+            {/* Phoenix content map */}
+            <div className="relative z-0 h-[46vh] min-h-[320px] max-h-[520px] rounded-3xl overflow-hidden shadow-[0_8px_24px_rgba(19,41,58,.12)] lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:h-full lg:max-h-none lg:min-h-[460px]">
+              <Map pins={pins} view={PHOENIX} preview />
+              <span className="absolute right-3 top-3 z-[500] inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[13px] font-extrabold shadow-md">
+                <i className="h-2 w-2 rounded-full bg-emerald-500" />Phoenix, AZ
+              </span>
+            </div>
+
+            {/* Newest pins: a swipe row on phones, a list beside the map on desktop */}
+            <div className="lg:col-start-2 lg:row-start-2">
+              <div className="flex items-baseline justify-between mb-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-gray-500">New POVs</p>
+                <Link href="/map" className="text-xs font-bold text-glacier hover:underline">See all →</Link>
+              </div>
+              {newPovs === null && <div className="h-16 rounded-2xl bg-white animate-pulse" />}
+              {newPovs?.length === 0 && <p className="text-sm text-gray-500">No videos synced yet.</p>}
+              <div className="flex gap-2.5 overflow-x-auto -mx-4 px-4 pb-1 lg:mx-0 lg:px-0 lg:flex-col lg:overflow-visible">
+                {newPovs?.map((v) => <PovMini key={v.id} video={v} />)}
+              </div>
+            </div>
           </div>
-          {/* Row 3: site totals */}
-          <dl className="mt-7 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl">
-            <Stat label="Total Creators" value={stats.creators} />
-            <Stat label="Total Fans" value={stats.fans} />
-            <Stat label="Total Locations" value={stats.locations} />
-          </dl>
         </header>
 
+        <div id="explore" className="scroll-mt-4" />
         <Section title="Featured Locations" items={featured} empty="No featured spots yet.">
           {featured?.map((v, i) => <SpotCard key={v.id} video={v} badge={`★ Featured #${i + 1}`} />)}
-        </Section>
-
-        <Section title="New POVs" items={newPovs} empty="No videos synced yet." moreHref="/map">
-          {newPovs?.map((v) => <SpotCard key={v.id} video={v} badge={v.posted_at ? new Date(v.posted_at).toLocaleDateString() : undefined} />)}
         </Section>
 
         <section className="mt-10">
@@ -139,10 +171,31 @@ function Section({ title, items, empty, moreHref, children }: {
 
 function Stat({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="card px-2 py-3 sm:px-4 sm:py-4 text-center">
-      <dd className="font-display text-2xl sm:text-4xl font-bold leading-none text-ink">{value === null ? '—' : value.toLocaleString()}</dd>
-      <dt className="mt-1.5 text-[10px] sm:text-xs font-extrabold uppercase tracking-wide text-gray-500">{label}</dt>
+    <div className="flex flex-col items-center px-1 py-3 text-center lg:flex-row-reverse lg:justify-between lg:px-5 lg:py-3.5 lg:text-left">
+      <dd className="font-display text-2xl sm:text-3xl font-bold leading-none text-ink">{value === null ? '—' : value.toLocaleString()}</dd>
+      <dt className="mt-1.5 lg:mt-0 text-[10px] sm:text-xs font-extrabold uppercase tracking-wide text-gray-500">{label}</dt>
     </div>
+  );
+}
+
+function PovMini({ video }: { video: PublicVideo }) {
+  return (
+    <Link href={`/map?focus=${video.id}`}
+      className="card flex w-[220px] shrink-0 items-center gap-3 p-2.5 border-2 border-transparent hover:border-ice transition-colors lg:w-auto">
+      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-ice to-frost">
+        {video.cover_url && (
+          <img src={video.cover_url} referrerPolicy="no-referrer" alt=""
+            onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+            className="absolute inset-0 h-full w-full object-cover" />
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="font-display text-base font-semibold leading-tight truncate">{video.place_name || 'Spot'}</p>
+        <p className="text-xs font-bold text-gray-500 truncate">
+          {[video.category, video.creators ? `@${video.creators.tiktok_username}` : null].filter(Boolean).join(' · ')}
+        </p>
+      </div>
+    </Link>
   );
 }
 
