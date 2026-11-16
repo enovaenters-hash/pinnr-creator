@@ -55,6 +55,7 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
       setStatus({
         text: [
           r.added ? `Added ${r.added} new video${r.added === 1 ? '' : 's'}` : `No new videos (checked ${r.checked})`,
+          r.tagged ? `${r.tagged} placed from your TikTok location tags` : null,
           r.mapped ? `${r.mapped} placed on the map` : null,
           r.pending ? `${r.pending} more will be placed on your next sync` : null,
         ].filter(Boolean).join(' · '),
