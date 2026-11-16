@@ -8,6 +8,57 @@ export interface RawTikTokVideo {
   postedAt: string | null;
   authorNickname: string | null;
   authorAvatar: string | null;
+  /** The creator's TikTok location tag, when it points at a specific place (not just a city). */
+  poi: TikTokPoi | null;
+}
+
+export interface TikTokPoi {
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  /** TikTok's own category text, e.g. "Food and Drink, Japanese Cuisine, Sushi Restaurant". */
+  kind: string | null;
+}
+
+/**
+ * Read the location tag (the "📍 Place" label) off a video. TikTok sends it in `anchors` as a
+ * `anchor_poi` entry whose `extra` JSON string carries the place name, street address and
+ * coordinates. City/region tags ("Phoenix", "Los Angeles") are ignored: they aren't a spot,
+ * and would pin every video to the middle of a city.
+ */
+export function poiFromAnchors(anchors: unknown): TikTokPoi | null {
+  if (!Array.isArray(anchors)) return null;
+  const a = anchors.find((x) => x && (x.component_key === 'anchor_poi' || x.type === 45)) as
+    { keyword?: string; extra?: string } | undefined;
+  if (!a) return null;
+
+  let ex: Record<string, unknown> = {};
+  try { ex = typeof a.extra === 'string' ? JSON.parse(a.extra) : {}; } catch { return null; }
+
+  let info: Record<string, unknown> = {};
+  try { info = typeof ex.collect_info === 'string' ? JSON.parse(ex.collect_info) : {}; } catch { /* optional */ }
+
+  const backend = String(ex.poi_backend_type ?? '');
+  const regional = info.poi_detail_type === 'regional' || String(ex.type_level) === '1' || /,City\|/.test(backend);
+  if (regional) return null;
+
+  const name = String(ex.Name ?? a.keyword ?? '').trim();
+  if (!name) return null;
+
+  const loc = (ex.location ?? {}) as { lat?: string | number; lng?: string | number };
+  const lat = Number(loc.lat);
+  const lng = Number(loc.lng);
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+  const address = String(ex.fallback_address ?? '').replace(/,\s*(USA|United States)$/i, '').trim() || null;
+
+  return {
+    name,
+    address,
+    lat: hasCoords ? lat : null,
+    lng: hasCoords ? lng : null,
+    kind: backend ? backend.split('|')[0].replace(/,/g, ', ') : null,
+  };
 }
 
 const BROWSER_HEADERS = {
@@ -79,6 +130,7 @@ export async function fetchLatestVideos(username: string, count = 20): Promise<R
       postedAt: Number.isFinite(created) && created > 0 ? new Date(created * 1000).toISOString() : null,
       authorNickname: author.nickname || null,
       authorAvatar: author.avatar || null,
+      poi: poiFromAnchors(v.anchors),
     };
   }).filter((v) => v.tiktokId);
 }
