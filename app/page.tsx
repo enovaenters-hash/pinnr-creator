@@ -91,8 +91,10 @@ export default function Home() {
           </ul>
         </section>
 
-        <footer className="mt-16 pt-6 border-t border-gray-200 flex justify-center gap-6 text-xs font-semibold text-gray-500">
+        <footer className="mt-16 pt-6 border-t border-gray-200 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-semibold text-gray-500">
           <Link href="/signup" className="hover:text-ink">Become a creator</Link>
+          <Link href="/privacy" className="hover:text-ink">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-ink">Terms of Service</Link>
           <Link href="/admin" className="hover:text-ink">Admin</Link>
         </footer>
       </div>
