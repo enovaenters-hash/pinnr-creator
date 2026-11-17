@@ -6,7 +6,7 @@ import type * as Leaflet from 'leaflet';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import { categoryColor } from '@/lib/types';
 import { FAN_CSS } from './fanMapStyles';
-import { pinSvg, ICE, SUN } from '@/lib/brand';
+import { pinSvg, ICE, SUN, INK } from '@/lib/brand';
 import Logo from '@/components/Logo';
 import NavLinks from '@/components/NavLinks';
 import SiteNav from '@/components/SiteNav';
@@ -26,6 +26,8 @@ type Vid = { id: string; date: string; dbId: string; code: string | null; cover:
 type Place = {
   name: string; cuisine: string; city: string; addr: string; lat: number; lon: number;
   videos: Vid[]; creator: string; creatorName: string; accent: string; featured: boolean; newest: string;
+  /** My-map only: the group this place is drawn in, and every group it belongs to. */
+  gk?: string; gks?: string[];
 };
 type CreatorInfo = { handle: string; name: string; avatar: string | null; accent: string; count: number };
 
@@ -202,44 +204,77 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         if (mine) openMine(h || 'follow'); else openPub(h);
       };
 
-      // ── My Map: the dropdown is the fan's lists, and a panel under the map edits the chosen one ──
-      // key: 'follow' (creators I follow), 'all' (everything I saved) or a list id.
+      // ── My Map: groups (Following, Saved and the fan's own lists) are buttons under the map ──
+      // key: 'all' (every group at once), 'follow' (creators I follow), 'saved' (everything I saved) or a list id.
+      type GDef = { key: string; name: string; color: string };
+      const LIST_COLORS = ['#e8590c', '#2fb77a', '#8a5cf0', '#e05aa8', '#0ea5a4', '#d9480f', '#4263eb', '#a8872c'];
+      const SAVED_COLOR = '#7c8da0';
+      const groupDefs = (): GDef[] => [
+        { key: 'follow', name: 'Following', color: ICE },
+        { key: 'saved', name: 'Saved', color: SAVED_COLOR },
+        ...LISTS.map((l, i) => ({ key: l.id, name: l.name, color: LIST_COLORS[i % LIST_COLORS.length] })),
+      ];
+      const gdef = (k: string | null | undefined) => groupDefs().find((g) => g.key === k);
+      const inGroup = (k: string, p: Place, v: Vid) =>
+        k === 'follow' ? followHandles.has(p.creator) : k === 'saved' ? SAVED_IDS.has(v.dbId) : !!LISTS.find((l) => l.id === k)?.ids.has(v.dbId);
+      /** Group order for pin colour and for the sections under "All": lists first (the fan made them), then Following, then Saved. */
+      const colorOrder = () => [...LISTS.map((l) => l.id), 'follow', 'saved'];
+      const sectionOrder = () => ['follow', ...LISTS.map((l) => l.id), 'saved'];
+      /** In "All", Saved only gets its own section for places that are in no other group. */
+      const secKeys = (p: Place) => (p.gks ?? []).filter((k) => k !== 'saved' || (p.gks ?? []).length === 1);
       const placesFor = (key: string): Place[] => {
-        const l = LISTS.find((x) => x.id === key);
-        const ids = l ? l.ids : key === 'all' ? SAVED_IDS : null;
-        if (ids) return ALL.map((p) => ({ ...p, videos: p.videos.filter((v) => ids.has(v.dbId)) })).filter((p) => p.videos.length);
-        return ALL.filter((p) => followHandles.has(p.creator));
+        if (key === 'all') {
+          const order = colorOrder();
+          return ALL.map((p): Place | null => {
+            const gks = order.filter((k) => p.videos.some((v) => inGroup(k, p, v)));
+            if (!gks.length) return null;
+            return { ...p, videos: p.videos.filter((v) => gks.some((k) => inGroup(k, p, v))), gk: gks[0], gks };
+          }).filter((p): p is Place => p !== null);
+        }
+        return ALL.map((p) => ({ ...p, videos: p.videos.filter((v) => inGroup(key, p, v)), gk: key, gks: [key] })).filter((p) => p.videos.length);
       };
-      const defaultKey = () => (FOLLOWED.size ? 'follow' : 'all');
+      const colorOf = (p: Place) => (mine ? gdef(p.gk)?.color ?? ICE : ICE);
+      const defaultKey = () => 'all';
       const isList = (k: string | null) => !!k && LISTS.some((x) => x.id === k);
       const spotWord = (n: number) => `${n} spot${n === 1 ? '' : 's'}`;
       let lpMode: 'idle' | 'rename' | 'new' | 'delete' = 'idle';
       let lpBusy = false;
       const changed = () => window.dispatchEvent(new CustomEvent('povgo:lists-changed'));
-      function fillListSelect() {
-        const savedShown = new Set(ALL.flatMap((p) => p.videos.map((v) => v.dbId).filter((id) => SAVED_IDS.has(id)))).size;
-        sel.innerHTML = `<option value="follow">Following (${followCount})</option><option value="all">All saved (${savedShown})</option>` +
-          LISTS.map((l) => `<option value="${esc(l.id)}">${esc(l.name)} · ${l.ids.size}</option>`).join('');
-        sel.value = CUR ?? 'follow';
+      /** Up to four cover photos from these places, as a little collage. */
+      const coversOf = (ps: Place[]) => {
+        const out: string[] = [];
+        for (const p of ps) for (const v of p.videos) if (v.cover && !out.includes(v.cover) && out.length < 4) out.push(v.cover);
+        return out;
+      };
+      const collage = (covers: string[]) => covers.length
+        ? `<span class="gph n${covers.length}">${covers.map((c) => `<img src="${esc(c)}" referrerpolicy="no-referrer" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`).join('')}</span>`
+        : `<span class="gph n0">${HOME_PIN}</span>`;
+      function renderGroups() {
+        const el = document.getElementById('pubGroups'); if (!el) return;
+        const tile = (key: string, name: string, color: string, ps: Place[]) =>
+          `<button type="button" class="gtile${CUR === key ? ' on' : ''}" data-g="${esc(key)}" style="--gc:${color}" aria-pressed="${CUR === key}">
+            ${collage(coversOf(ps))}<span class="gnm">${esc(name)}</span><span class="gct">${spotWord(ps.length)}</span></button>`;
+        el.innerHTML = tile('all', 'All', INK, placesFor('all'))
+          + groupDefs().map((g) => tile(g.key, g.name, g.color, placesFor(g.key))).join('')
+          + `<button type="button" class="gtile new" data-new="1"><span class="gplus" aria-hidden="true">+</span><span class="gnm">New list</span></button>`;
       }
       function openMine(key: string) {
-        const l = LISTS.find((x) => x.id === key);
-        CUR = l ? l.id : key === 'all' ? 'all' : 'follow';
+        CUR = key === 'all' || key === 'follow' || key === 'saved' || isList(key) ? key : 'all';
         combinedMode = true; ACCENT = SUN;
         $('pub').style.setProperty('--accent', ACCENT);
         PUBSET = placesFor(CUR);
         lpMode = 'idle';
-        fillListSelect();
         $('pubPfp').innerHTML = HOME_PIN;
-        $('pubName').textContent = l ? l.name : CUR === 'all' ? 'All saved' : 'Following';
+        $('pubName').textContent = CUR === 'all' ? 'All' : gdef(CUR)?.name ?? 'All';
         $('pubHandle').textContent = `${spotWord(PUBSET.length)} · tap a pin to watch`;
         showPub();
+        renderGroups();
         renderListPanel();
       }
       function renderListPanel() {
         const el = document.getElementById('pubListEdit'); if (!el) return;
         const l = LISTS.find((x) => x.id === CUR);
-        const title = l ? l.name : CUR === 'all' ? 'All saved' : 'Following';
+        const title = CUR === 'all' ? 'All' : gdef(CUR)?.name ?? 'All';
         let body = '';
         if (lpMode === 'rename' && l) {
           body = `<form class="lp-form" data-lp-form="rename"><input name="n" value="${esc(l.name)}" maxlength="60" aria-label="List name" autocomplete="off">
@@ -250,17 +285,31 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         } else if (lpMode === 'delete' && l) {
           body = `<div class="lp-confirm">Delete “${esc(l.name)}”? Its spots stay saved.
             <button class="lp-btn danger" type="button" data-lp="delete-yes">Delete</button><button class="lp-btn" type="button" data-lp="cancel">Keep</button></div>`;
-        } else {
-          body = `<div class="lp-btns">${l ? `<button class="lp-btn" type="button" data-lp="rename">Rename</button><button class="lp-btn" type="button" data-lp="delete">Delete list</button>` : ''}
-            <button class="lp-btn sun" type="button" data-lp="new">+ New list</button></div>`;
+        } else if (l) {
+          body = `<div class="lp-btns"><button class="lp-btn" type="button" data-lp="rename">Rename</button><button class="lp-btn" type="button" data-lp="delete">Delete list</button></div>`;
         }
-        const what = CUR === 'all' ? 'Everything you saved.' : FOLLOWED.size ? 'Spots from the creators you follow.' : 'Follow a few creators and their spots will show up here.';
+        const what = CUR === 'all' ? 'Every group at once, each in its own pin color.'
+          : CUR === 'saved' ? 'Everything you saved.'
+          : CUR === 'follow' ? (FOLLOWED.size ? 'Spots from the creators you follow.' : 'Follow a few creators and their spots will show up here.') : '';
         const hint = !l && lpMode === 'idle'
-          ? `<p class="lp-hint">${what} ${LISTS.length ? 'Pick a list from the menu at the top to edit it.' : 'Make a list like “Date night” with + New list.'}</p>` : '';
+          ? `<p class="lp-hint">${what} ${LISTS.length ? 'Pick one of your lists above to rename or delete it.' : 'Make a list like “Date night” with the + New list button.'}</p>` : '';
         const empty = l && !PUBSET.length ? `<p class="lp-hint">This list is empty. Open Saved and tap “+ List” on a video to add it here.</p>` : '';
         el.innerHTML = `<div class="lp-head"><h3>${esc(title)}</h3><span class="lp-n">${spotWord(PUBSET.length)}</span></div>${body}${hint}${empty}`;
         el.querySelector('input')?.focus();
       }
+      // Group buttons under the map: pick one, or start a new list.
+      document.getElementById('pubGroups')?.addEventListener('click', (e) => {
+        const t = e.target as HTMLElement;
+        const g = t.closest('[data-g]') as HTMLElement | null;
+        const nw = t.closest('[data-new]');
+        if (g) {
+          const key = g.dataset.g!;
+          const url = new URL(window.location.href); url.searchParams.delete('focus');
+          if (key === 'all') url.searchParams.delete('list'); else url.searchParams.set('list', key);
+          window.history.replaceState(null, '', url);
+          openMine(key);
+        } else if (nw) { lpMode = 'new'; renderListPanel(); }
+      });
       document.getElementById('pubListEdit')?.addEventListener('click', async (e) => {
         const t = (e.target as HTMLElement).closest('[data-lp]') as HTMLElement | null;
         if (!t || lpBusy) return;
@@ -301,13 +350,13 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         }
       });
       // "Remove" on a card takes that place out of the chosen list (it stays saved).
-      async function removeFromList(p: Place) {
-        const l = LISTS.find((x) => x.id === CUR); if (!l) return;
+      async function removeFromList(p: Place, listId: string) {
+        const l = LISTS.find((x) => x.id === listId); if (!l) return;
         const vids = p.videos.map((v) => v.dbId);
         const { error } = await getSupabase().from('list_items').delete().eq('list_id', l.id).in('video_id', vids);
         if (error) return;
         vids.forEach((v) => l.ids.delete(v));
-        openMine(l.id); changed();
+        openMine(CUR ?? 'all'); changed();
       }
 
       function openPub(handle: string | null) {
@@ -328,21 +377,21 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       }
 
       // POVGo Play Pin markers: ice blue, and sunny yellow for the place being watched.
-      function pin(count: number, selected = false) {
+      function pin(count: number, selected = false, color = ICE) {
         const size = selected ? 38 : 30;
         const badge = count > 1 ? `<span class="marker-badge">${count}</span>` : '';
         return L.divIcon({
           className: '', iconSize: [size, size], iconAnchor: [size / 2, size - 1], popupAnchor: [0, -size],
-          html: `<div style="position:relative;width:${size}px;height:${size}px">${pinSvg(size, selected ? SUN : ICE)}${badge}</div>`,
+          html: `<div style="position:relative;width:${size}px;height:${size}px">${pinSvg(size, selected ? SUN : color)}${badge}</div>`,
         });
       }
       let litMarker = -1;
       function lightMarker(i: number) {
         if (litMarker >= 0 && pubMarkers[litMarker]) {
-          pubMarkers[litMarker].setIcon(pin(PUBSET[litMarker].videos.length)).setZIndexOffset(0);
+          pubMarkers[litMarker].setIcon(pin(PUBSET[litMarker].videos.length, false, colorOf(PUBSET[litMarker]))).setZIndexOffset(0);
         }
         litMarker = i;
-        if (i >= 0 && pubMarkers[i]) pubMarkers[i].setIcon(pin(PUBSET[i].videos.length, true)).setZIndexOffset(1000);
+        if (i >= 0 && pubMarkers[i]) pubMarkers[i].setIcon(pin(PUBSET[i].videos.length, true, colorOf(PUBSET[i]))).setZIndexOffset(1000);
       }
 
       // On the home page the video panel floats over the right of the map, so aim the pin at the visible part.
@@ -378,7 +427,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         });
         pubMarkers.forEach((m) => pubmap!.removeLayer(m)); pubMarkers = []; litMarker = -1;
         PUBSET.forEach((p, i) => {
-          const m = L.marker([p.lat, p.lon], { icon: pin(p.videos.length) }).addTo(pubmap!);
+          const m = L.marker([p.lat, p.lon], { icon: pin(p.videos.length, false, colorOf(p)) }).addTo(pubmap!);
           m.on('click', () => selectPub(i)); pubMarkers[i] = m;
         });
         $('pubRight').innerHTML = PUBSET.length
@@ -392,7 +441,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       function selectPub(i: number, dbId?: string, fromList?: boolean) {
         pubSel = i; const p = PUBSET[i];
         lightMarker(i);
-        [...$('pubList').children].forEach((x) => x.classList.toggle('on', Number((x as HTMLElement).dataset.i) === i));
+        $('pubList').querySelectorAll('.pcard').forEach((x) => x.classList.toggle('on', Number((x as HTMLElement).dataset.i) === i));
         if (!pageMode) $('pubList').querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
         pubVidP = p;
         buildCreatorVideoList(p.creator);
@@ -578,17 +627,29 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
 
       function renderPubList() {
         const el = $('pubList'); el.innerHTML = '';
-        PUBSET.forEach((p, i) => {
+        const mkCard = (p: Place, i: number, gk: string | null) => {
           const card = document.createElement('div'); card.className = 'pcard' + (i === pubSel ? ' on' : ''); card.dataset.i = String(i);
           card.innerHTML = `<h4>${esc(p.name)}</h4>
             ${combinedMode ? `<div class="by"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a></div>` : ''}
             <div class="mt"><span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}</div>
-            ${mine && isList(CUR) ? '<button class="premove" type="button">Remove from list</button>' : ''}`;
+            ${mine && isList(gk) ? '<button class="premove" type="button">Remove from list</button>' : ''}`;
           card.onclick = () => selectPub(i, undefined, true);
           const rm = card.querySelector('.premove') as HTMLElement | null;
-          if (rm) rm.onclick = (ev) => { ev.stopPropagation(); removeFromList(p); };
-          el.appendChild(card);
-        });
+          if (rm) rm.onclick = (ev) => { ev.stopPropagation(); removeFromList(p, gk!); };
+          return card;
+        };
+        if (mine && CUR === 'all') {
+          // Every group at once: a section per group, with its photo and name.
+          sectionOrder().forEach((k) => {
+            const idxs = PUBSET.map((_, i) => i).filter((i) => secKeys(PUBSET[i]).includes(k));
+            const d = gdef(k); if (!idxs.length || !d) return;
+            const sec = document.createElement('div'); sec.className = 'gsec';
+            sec.innerHTML = `<div class="gsec-h" style="--gc:${d.color}">${collage(coversOf(idxs.map((i) => PUBSET[i])))}<h3>${esc(d.name)}</h3><span class="gsec-n">${spotWord(idxs.length)}</span></div><div class="gsec-cards"></div>`;
+            const box = sec.querySelector('.gsec-cards')!;
+            idxs.forEach((i) => box.appendChild(mkCard(PUBSET[i], i, k)));
+            el.appendChild(sec);
+          });
+        } else PUBSET.forEach((p, i) => el.appendChild(mkCard(p, i, CUR)));
       }
 
       function applyPubFilter(fit?: boolean) {
@@ -597,9 +658,12 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           const ok = visiblePub(i);
           const showPin = ok || pubVidP === p;
           if (pubMarkers[i]) { if (showPin) pubmap!.addLayer(pubMarkers[i]); else pubmap!.removeLayer(pubMarkers[i]); }
-          const card = $('pubList').querySelector(`[data-i="${i}"]`) as HTMLElement | null;
-          if (card) card.style.display = ok ? '' : 'none';
+          $('pubList').querySelectorAll(`.pcard[data-i="${i}"]`).forEach((c) => { (c as HTMLElement).style.display = ok ? '' : 'none'; });
           if (showPin) { shown++; pts.push([p.lat, p.lon]); }
+        });
+        $('pubList').querySelectorAll('.gsec').forEach((sec) => {
+          const any = [...sec.querySelectorAll('.pcard')].some((c) => (c as HTMLElement).style.display !== 'none');
+          (sec as HTMLElement).style.display = any ? '' : 'none';
         });
         $('pubCount').textContent = `${shown} place${shown === 1 ? '' : 's'}`;
         if (fit && view) pubmap!.setView(view.center, view.zoom);
@@ -627,7 +691,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (focusPlace && start && focusPlace.creator !== start && !embedded) start = null;
       if (mine) {
         const wantList = params.get('list');
-        openMine(wantList && (wantList === 'all' || isList(wantList)) ? wantList : defaultKey());
+        openMine(wantList && (wantList === 'all' || wantList === 'follow' || wantList === 'saved' || isList(wantList)) ? wantList : defaultKey());
       } else openPub(start);
       if (!mine && focusPlace && PUBSET.includes(focusPlace)) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
 
@@ -680,12 +744,13 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
               <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
               <div className="pubwho"><div className="nm" id="pubName">{mine ? 'All saved' : 'All Spots'}</div><div className="h" id="pubHandle">Loading…</div></div>
               <a className="pubview" id="pubView" href="/" hidden>View page</a>
-              <select className="pubsel" id="pubCreator" aria-label={mine ? 'Choose list' : 'Choose creator'}><option>{mine ? 'All saved' : 'All creators'}</option></select>
+              <select className="pubsel" id="pubCreator" style={mine ? { display: 'none' } : undefined} aria-label="Choose creator"><option>{mine ? 'All saved' : 'All creators'}</option></select>
             </div>
             <div className="pubmain">
               <div id="pubmap"><div className="pubload" id="pubLoading">Loading map…</div></div>
               <aside className="pubright" id="pubRight" />
             </div>
+            {mine && <section className="gpick" id="pubGroups" aria-label="Groups" />}
             {mine && <section className="lpanel" id="pubListEdit" aria-label="Current list" />}
             <section className="publist" id="pubLeft" aria-label="Places">
               <div className="srch"><input id="pubSearch" type="search" placeholder="Search places…" autoComplete="off" /></div>

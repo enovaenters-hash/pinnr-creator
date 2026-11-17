@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 
 export type NavActive = 'home' | 'login' | 'admin';
@@ -11,10 +10,9 @@ const pill = 'whitespace-nowrap rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2 text-
 const on = 'bg-white shadow-sm';
 const off = 'opacity-85 hover:bg-white/40 hover:opacity-100';
 
-/** Explore · Sign in (or your account menu: Following, My Spots, Sign out). Shared by the site bar and the fan map bar. */
+/** Sign in, or your account menu with Sign out. The main navigation (Explore, Following, My Spots) lives in BottomNav. Shared by the site bar and the fan map bar. */
 export default function NavLinks({ active, className = '' }: { active?: NavActive; className?: string }) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
   const box = useRef<HTMLDivElement>(null);
   // undefined = checking, null = signed out, string = signed in (the first letter of their name or email)
   const [who, setWho] = useState<string | null | undefined>(undefined);
@@ -51,11 +49,6 @@ export default function NavLinks({ active, className = '' }: { active?: NavActiv
 
   return (
     <nav aria-label="Main" className={`flex items-center gap-0.5 sm:gap-1.5 ${className}`}>
-      <Link href="/" aria-current={active === 'home' ? 'page' : undefined} className={`${pill} ${active === 'home' ? on : off}`}
-        onClick={(e) => {
-          // Already on Explore: don't reload, just go back to the top of the page (and drop any ?focus= / #hash).
-          if (pathname === '/') { e.preventDefault(); window.history.replaceState(null, '', '/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-        }}>Explore</Link>
       {who === null ? (
         <Link href="/login" className={`${pill} ${active === 'login' ? on : 'bg-white shadow-sm'}`}>Sign in</Link>
       ) : who === undefined ? (
@@ -68,15 +61,7 @@ export default function NavLinks({ active, className = '' }: { active?: NavActiv
             <span aria-hidden="true" className={`text-[10px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
           </button>
           {open && (
-            <div role="menu" className="absolute right-0 top-full mt-2 w-52 rounded-2xl bg-white p-1.5 shadow-[0_10px_30px_rgba(19,41,58,.18)] ring-1 ring-black/5">
-              <Link role="menuitem" href="/fan" onClick={() => setOpen(false)} className="flex flex-col rounded-xl px-3 py-2 text-ink hover:bg-frost">
-                <span className="font-extrabold text-sm">Following</span>
-                <span className="text-xs font-semibold text-gray-500">Creators, saved spots and lists</span>
-              </Link>
-              <Link role="menuitem" href="/fan?view=myspots" onClick={() => setOpen(false)} className="flex flex-col rounded-xl px-3 py-2 text-ink hover:bg-frost">
-                <span className="font-extrabold text-sm">My Spots</span>
-                <span className="text-xs font-semibold text-gray-500">Your own spots and page</span>
-              </Link>
+            <div role="menu" className="absolute right-0 top-full mt-2 w-40 rounded-2xl bg-white p-1.5 shadow-[0_10px_30px_rgba(19,41,58,.18)] ring-1 ring-black/5">
               <button role="menuitem" type="button" onClick={signOut} className="w-full text-left rounded-xl px-3 py-2 text-ink hover:bg-frost font-extrabold text-sm">Sign out</button>
             </div>
           )}

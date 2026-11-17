@@ -205,4 +205,30 @@ export const FAN_CSS = `
   #pub.page .lp-form input:focus{border-color:var(--bar);box-shadow:0 0 0 3px var(--frost)}
   #pub.page .lp-hint{margin:10px 0 0;font-size:13px;font-weight:700;color:var(--muted)}
   #pub.page .premove{margin-top:8px;font-family:inherit;font-size:12px;font-weight:800;color:var(--ink);background:#fff;border:0;border-radius:999px;padding:5px 12px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+  /* My Map groups: photo buttons under the map (All, Following, Saved, each list), and a section per group when All is picked. */
+  #pub.page .gpick{display:flex;gap:10px;margin-top:14px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  #pub.page .gtile{flex:0 0 auto;width:100px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:stretch;text-align:left;font-family:inherit;color:var(--ink);background:#fff;border:0;border-radius:18px;padding:0 0 9px;cursor:pointer;overflow:hidden;box-shadow:inset 0 0 0 2px var(--line),0 4px 14px rgba(19,41,58,.06);border-top:5px solid var(--gc,var(--line))}
+  #pub.page .gtile:hover{box-shadow:inset 0 0 0 2px var(--gc,var(--line)),0 4px 14px rgba(19,41,58,.1)}
+  #pub.page .gtile.on{box-shadow:inset 0 0 0 3px var(--gc,var(--ink)),0 6px 18px rgba(19,41,58,.14);background:#fffbe8}
+  #pub.page .gtile:focus-visible{outline:3px solid var(--bar);outline-offset:2px}
+  #pub.page .gtile .gnm{font-family:var(--display);font-weight:600;font-size:14px;line-height:1.2;padding:7px 10px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #pub.page .gtile .gct{font-size:11px;font-weight:800;color:var(--muted);padding:1px 10px 0}
+  #pub.page .gtile.new{border-top-color:transparent;background:transparent;box-shadow:inset 0 0 0 2px var(--line);border-style:dashed;justify-content:center;align-items:center;min-height:120px;border-top:0;box-shadow:none;border:2px dashed var(--line);padding:0}
+  #pub.page .gtile.new .gnm{padding:2px 0 0;text-align:center}
+  #pub.page .gtile.new .gplus{font-size:30px;font-weight:700;line-height:1;color:var(--glacier,#1c7fb0)}
+  #pub.page .gph{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;height:66px;background:var(--frost,#dff4fc);overflow:hidden;color:var(--bar)}
+  #pub.page .gph img{width:100%;height:100%;object-fit:cover;display:block;min-width:0;min-height:0}
+  #pub.page .gph.n1 img{grid-column:1/3;grid-row:1/3}
+  #pub.page .gph.n2 img{grid-row:1/3}
+  #pub.page .gph.n3 img:first-child{grid-row:1/3}
+  #pub.page .gph.n0{display:grid;place-items:center}
+  #pub.page .gph.n0 svg{width:30px;height:30px}
+  #pub.page #pubList .gsec{grid-column:1/-1;min-width:0;margin-top:8px}
+  #pub.page #pubList .gsec:first-child{margin-top:0}
+  #pub.page .gsec-h{display:flex;align-items:center;gap:12px;margin:0 0 10px;padding-left:12px;border-left:6px solid var(--gc,var(--line))}
+  #pub.page .gsec-h .gph{flex:0 0 64px;width:64px;height:48px;border-radius:12px}
+  #pub.page .gsec-h h3{font-family:var(--display);font-weight:600;font-size:20px;margin:0;min-width:0;overflow-wrap:anywhere}
+  #pub.page .gsec-n{font-size:12px;font-weight:800;color:var(--muted);margin-left:auto;white-space:nowrap}
+  #pub.page .gsec-cards{display:grid;grid-template-columns:1fr;gap:10px}
+  @media(min-width:761px){#pub.page .gsec-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#pub.page .gtile{width:132px}}
 `;

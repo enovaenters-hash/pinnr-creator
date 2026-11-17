@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import type { Creator, Video } from '@/lib/types';
 import SiteNav from '@/components/SiteNav';
+import BottomNav from '@/components/BottomNav';
 import FanMap from '@/components/FanMap';
 
 type Top = Pick<Video, 'id' | 'place_name' | 'address' | 'category' | 'cover_url' | 'video_url' | 'lat' | 'featured' | 'posted_at'>;
@@ -123,7 +124,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
     <>
       <SiteNav />
       <main className="flex-1 bg-cloud text-ink">
-        <div className="max-w-5xl mx-auto px-4 pb-16">
+        <div className="max-w-5xl mx-auto px-4 pb-28">
           {/* Who: photo, then name (shrinks to fit one line) over handle + small buttons */}
           <header className="pt-5 pb-4 flex items-center gap-3 sm:gap-4">
             <Avatar creator={creator} handle={handle} />
@@ -197,6 +198,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
           </section>
         </div>
       </main>
+      <BottomNav />
     </>
   );
 }

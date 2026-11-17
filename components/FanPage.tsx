@@ -9,6 +9,7 @@ import {
   FAN_VIDEO_FIELDS, catLabel, cityOf, formatMiles, milesBetween, timeAgo, videoHref,
   type FanCreator, type FanList, type FanVideo, type SavedVideo,
 } from '@/lib/fan';
+import BottomNav from '@/components/BottomNav';
 import SiteNav from '@/components/SiteNav';
 import CreatorDashboard from '@/components/CreatorDashboard';
 import { NotConfigured } from '@/components/AuthCard';
@@ -21,11 +22,6 @@ type View = 'following' | 'myspots';
 type FTab = 'latest' | 'saved';
 type Sort = 'new' | 'near' | 'creator' | 'az';
 
-const NAV: { key: 'explore' | View; label: string; icon: React.ReactNode; href?: string }[] = [
-  { key: 'explore', label: 'Explore', href: '/', icon: <><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M15.8 8.2L13.6 13.6L8.2 15.8L10.4 10.4Z" /></> },
-  { key: 'following', label: 'Following', icon: <path d="M12 20.8C4.8 15.7 3 12.4 3 9.2A4.9 4.9 0 0 1 12 6.6 4.9 4.9 0 0 1 21 9.2C21 12.4 19.2 15.7 12 20.8Z" /> },
-  { key: 'myspots', label: 'My Spots', icon: <><path d="M12 21.5C12 21.5 4.5 14.5 4.5 9.5A7.5 7.5 0 0 1 19.5 9.5C19.5 14.5 12 21.5 12 21.5Z" /><circle cx="12" cy="9.5" r="2.6" fill="#fff" /></> },
-];
 const FTABS: { key: FTab; label: string }[] = [
   { key: 'latest', label: 'Latest' }, { key: 'saved', label: 'Saved' },
 ];
@@ -285,8 +281,8 @@ export default function FanPage() {
     <>
       <SiteNav active="login" />
       <main className="flex-1 bg-cloud text-ink">
-        <div className="max-w-5xl mx-auto px-4 pt-5 pb-28 sm:pb-16">
-          {/* Who + navigation (buttons across the top on a computer) */}
+        <div className="max-w-5xl mx-auto px-4 pt-5 pb-28">
+          {/* Who (the main navigation is the bar along the bottom) */}
           <header className="flex flex-wrap items-center gap-x-4 gap-y-3 mb-5">
             <div className="min-w-0">
               <h1 className="font-display text-2xl sm:text-3xl font-semibold leading-tight truncate">Hey, {name}</h1>
@@ -294,14 +290,6 @@ export default function FanPage() {
                 {saved.length} saved · {lists.length} list{lists.length === 1 ? '' : 's'} · {follows.length} creator{follows.length === 1 ? '' : 's'}
               </p>
             </div>
-            <nav aria-label="Fan page" className="hidden sm:flex gap-1.5 ml-auto">
-              {NAV.map((v) => {
-                const cls = `inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-extrabold rounded-full whitespace-nowrap ${view === v.key ? 'btn-sun' : 'btn-ghost'}`;
-                return v.href
-                  ? <Link key={v.key} href={v.href} className={cls}><NavIcon>{v.icon}</NavIcon>{v.label}</Link>
-                  : <button key={v.key} type="button" onClick={() => go(v.key as View)} aria-current={view === v.key ? 'page' : undefined} className={cls}><NavIcon>{v.icon}</NavIcon>{v.label}</button>;
-              })}
-            </nav>
           </header>
 
           {view === 'following' && (
@@ -434,18 +422,10 @@ export default function FanPage() {
         </div>
       </main>
 
-      {/* Navigation along the bottom on a phone */}
-      <nav aria-label="Fan page" className="sm:hidden fixed inset-x-0 bottom-0 z-[1090] bg-white border-t border-gray-200 grid grid-cols-3 px-1 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
-        {NAV.map((v) => {
-          const cls = `grid justify-items-center gap-0.5 py-1.5 rounded-2xl text-[10px] font-extrabold leading-tight ${view === v.key ? 'bg-sun-soft text-ink' : 'text-gray-500'}`;
-          return v.href
-            ? <Link key={v.key} href={v.href} className={cls}><NavIcon className="w-6 h-6">{v.icon}</NavIcon>{v.label}</Link>
-            : <button key={v.key} type="button" onClick={() => go(v.key as View)} aria-current={view === v.key ? 'page' : undefined} className={cls}><NavIcon className="w-6 h-6">{v.icon}</NavIcon>{v.label}</button>;
-        })}
-      </nav>
+      <BottomNav active={view} onSelect={(v) => go(v)} />
 
       {notice && (
-        <div role="status" className="pointer-events-none fixed left-1/2 -translate-x-1/2 bottom-24 sm:bottom-6 z-[1200] bg-ink text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg">{notice}</div>
+        <div role="status" className="pointer-events-none fixed left-1/2 -translate-x-1/2 bottom-24 z-[1200] bg-ink text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg">{notice}</div>
       )}
     </>
   );
@@ -477,10 +457,6 @@ function FeedCard({ video: v, saved, onSave, onFollow }: { video: FanVideo; save
       {onFollow && <button type="button" onClick={onFollow} className="btn-ghost py-1.5 text-xs">+ Follow</button>}
     </article>
   );
-}
-
-function NavIcon({ children, className = 'w-4 h-4' }: { children: React.ReactNode; className?: string }) {
-  return <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">{children}</svg>;
 }
 
 function Avatar({ creator, className }: { creator: Pick<FanCreator, 'tiktok_username' | 'display_name' | 'avatar_url'>; className: string }) {
