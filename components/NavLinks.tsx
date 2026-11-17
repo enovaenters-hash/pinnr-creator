@@ -2,17 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 
-export type NavActive = 'home' | 'map' | 'login' | 'admin';
+export type NavActive = 'home' | 'login' | 'admin';
 
 const pill = 'whitespace-nowrap rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2 text-[13px] sm:text-sm font-extrabold text-ink transition-colors';
 const on = 'bg-white shadow-sm';
 const off = 'opacity-85 hover:bg-white/40 hover:opacity-100';
 
-/** Home · Explore · Map · Sign in (or your account menu: Following, My Spots, Sign out). Shared by the site bar and the fan map bar. */
+/** Explore · Sign in (or your account menu: Following, My Spots, Sign out). Shared by the site bar and the fan map bar. */
 export default function NavLinks({ active, className = '' }: { active?: NavActive; className?: string }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
   const box = useRef<HTMLDivElement>(null);
   // undefined = checking, null = signed out, string = signed in (the first letter of their name or email)
   const [who, setWho] = useState<string | null | undefined>(undefined);
@@ -49,9 +51,11 @@ export default function NavLinks({ active, className = '' }: { active?: NavActiv
 
   return (
     <nav aria-label="Main" className={`flex items-center gap-0.5 sm:gap-1.5 ${className}`}>
-      <Link href="/" aria-current={active === 'home' ? 'page' : undefined} className={`${pill} hidden sm:inline-block ${active === 'home' ? on : off}`}>Home</Link>
-      <Link href="/#explore" className={`${pill} ${off}`}>Explore</Link>
-      <Link href="/map" aria-current={active === 'map' ? 'page' : undefined} className={`${pill} ${active === 'map' ? on : off}`}>Map</Link>
+      <Link href="/" aria-current={active === 'home' ? 'page' : undefined} className={`${pill} ${active === 'home' ? on : off}`}
+        onClick={(e) => {
+          // Already on Explore: don't reload, just go back to the top of the page (and drop any ?focus= / #hash).
+          if (pathname === '/') { e.preventDefault(); window.history.replaceState(null, '', '/'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        }}>Explore</Link>
       {who === null ? (
         <Link href="/login" className={`${pill} ${active === 'login' ? on : 'bg-white shadow-sm'}`}>Sign in</Link>
       ) : who === undefined ? (

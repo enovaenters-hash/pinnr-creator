@@ -5,7 +5,7 @@ import type { PublicVideo } from '@/components/PublicMap';
 export default function SpotCard({ video, badge }: { video: PublicVideo; badge?: string }) {
   const handle = video.creators?.tiktok_username;
   return (
-    <Link href={`/map?focus=${video.id}`}
+    <Link href={`/?focus=${video.id}`}
       className="group block card overflow-hidden border-2 border-transparent hover:border-ice transition-colors">
       <div className="relative aspect-[4/5] bg-frost">
         {video.cover_url && (

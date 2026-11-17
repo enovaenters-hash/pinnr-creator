@@ -109,7 +109,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
         <main className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
           <h1 className="text-2xl font-semibold">We couldn&apos;t find @{handle}</h1>
           <p className="text-gray-600 text-sm">They may not have joined POVGo yet.</p>
-          <Link href="/map" className="btn-sun px-6 py-3">Explore the Fan Map</Link>
+          <Link href="/" className="btn-sun px-6 py-3">Explore POVGo</Link>
         </main>
       </>
     );

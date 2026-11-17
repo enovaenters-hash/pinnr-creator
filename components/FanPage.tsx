@@ -17,8 +17,8 @@ const FanMap = dynamic(() => import('@/components/FanMap'), { ssr: false });
 
 /** Three main parts: Explore (the public home page, unchanged), Following and My Spots. */
 type View = 'following' | 'myspots';
-/** Inside Following: newest from your creators, a map of their spots (plus your lists), and your saved videos. */
-type FTab = 'latest' | 'map' | 'saved';
+/** Inside Following: newest from your creators, and your saved videos. The map sits under both. */
+type FTab = 'latest' | 'saved';
 type Sort = 'new' | 'near' | 'creator' | 'az';
 
 const NAV: { key: 'explore' | View; label: string; icon: React.ReactNode; href?: string }[] = [
@@ -27,7 +27,7 @@ const NAV: { key: 'explore' | View; label: string; icon: React.ReactNode; href?:
   { key: 'myspots', label: 'My Spots', icon: <><path d="M12 21.5C12 21.5 4.5 14.5 4.5 9.5A7.5 7.5 0 0 1 19.5 9.5C19.5 14.5 12 21.5 12 21.5Z" /><circle cx="12" cy="9.5" r="2.6" fill="#fff" /></> },
 ];
 const FTABS: { key: FTab; label: string }[] = [
-  { key: 'latest', label: 'Latest' }, { key: 'map', label: 'Map' }, { key: 'saved', label: 'Saved' },
+  { key: 'latest', label: 'Latest' }, { key: 'saved', label: 'Saved' },
 ];
 const SORTS: { key: Sort; label: string }[] = [
   { key: 'new', label: 'Newest saved' }, { key: 'near', label: 'Closest' },
@@ -43,6 +43,7 @@ export default function FanPage() {
   const [name, setName] = useState('');
   const [view, setView] = useState<View>('following');
   const [ftab, setFtab] = useState<FTab>('latest');
+  const [jumpToMap, setJumpToMap] = useState(false); // an old /fan?view=map link: scroll to the map once the page is ready
   const [follows, setFollows] = useState<FanCreator[]>([]);
   const [creators, setCreators] = useState<FanCreator[]>([]);
   const [feed, setFeed] = useState<FanVideo[] | null>(null);
@@ -94,13 +95,13 @@ export default function FanPage() {
 
   useEffect(() => {
     if (!supabaseConfigured) return;
-    // Older links: ?view=creator -> My Spots, ?view=videos -> Saved, ?view=map or lists -> Map.
+    // Older links: ?view=creator -> My Spots, ?view=videos -> Saved, ?view=map or lists -> scroll down to the map.
     const q = new URLSearchParams(window.location.search);
     const wanted = q.get('view'), wantedTab = q.get('tab');
     if (wanted === 'myspots' || wanted === 'creator') setView('myspots');
     else if (wanted === 'videos') setFtab('saved');
-    else if (wanted === 'map' || wanted === 'lists' || q.get('list')) setFtab('map');
-    else if (wantedTab === 'map' || wantedTab === 'saved') setFtab(wantedTab);
+    else if (wanted === 'map' || wanted === 'lists' || q.get('list') || wantedTab === 'map') setJumpToMap(true);
+    else if (wantedTab === 'saved') setFtab('saved');
     const supabase = getSupabase();
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -138,6 +139,13 @@ export default function FanPage() {
       } catch { /* not supported; the "Use my location" button still works */ }
     })();
   }, [loadFeed, loadDiscover, locate]);
+
+  // Old links to the map (/fan?view=map, ?list=...) land on Following and scroll down to it.
+  useEffect(() => {
+    if (!jumpToMap || !uid) return;
+    const t = setTimeout(() => document.getElementById('following-map')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
+    return () => clearTimeout(t);
+  }, [jumpToMap, uid]);
 
   // The Following map edits lists and saves on its own; pick up those changes so the Saved tab and the counts stay right.
   useEffect(() => {
@@ -244,7 +252,7 @@ export default function FanPage() {
             <div className="mt-6 grid gap-2">
               <Link href="/signup" className="btn-sun py-3 text-sm">Join POVGo</Link>
               <Link href="/login?next=/fan" className="btn-ghost py-3 text-sm">Sign in</Link>
-              <Link href="/map" className="text-sm font-bold text-glacier hover:underline mt-1">Just explore the map →</Link>
+              <Link href="/" className="text-sm font-bold text-glacier hover:underline mt-1">Just explore the map →</Link>
             </div>
           </div>
         </main>
@@ -392,7 +400,7 @@ export default function FanPage() {
               <h2 className="text-xl font-semibold mb-3 flex items-baseline gap-2">Saved videos
                 <span className="text-xs font-bold text-gray-500 font-sans">{saved.length} saved from creators</span></h2>
               {saved.length === 0 ? (
-                <Empty>Nothing saved yet. Tap the heart on any video in your <button type="button" className="font-extrabold text-glacier underline" onClick={() => go('following')}>Latest</button> or on the <Link href="/map" className="font-extrabold text-glacier underline">Map</Link>.</Empty>
+                <Empty>Nothing saved yet. Tap the heart on any video in your <button type="button" className="font-extrabold text-glacier underline" onClick={() => go('following')}>Latest</button> or on the <Link href="/" className="font-extrabold text-glacier underline">Explore</Link> map.</Empty>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-1.5 mb-4" role="group" aria-label="Sort my videos">
@@ -415,8 +423,9 @@ export default function FanPage() {
             </section>
           )}
 
-          {view === 'following' && ftab === 'map' && (
-            <section aria-label="Following map">
+          {view === 'following' && (
+            <section id="following-map" aria-label="Following map" className="mt-10 scroll-mt-4">
+              <h2 className="text-xl font-semibold mb-3">Map</h2>
               <FanMap mine />
             </section>
           )}
@@ -459,7 +468,7 @@ function FeedCard({ video: v, saved, onSave, onFollow }: { video: FanVideo; save
       <Cover video={v} ratio="aspect-[3/4] sm:aspect-[4/5]" sub={[catLabel(v.category), cityOf(v.address)].filter(Boolean).join(' · ')} />
       <div className="flex items-center gap-1.5 px-0.5">
         {v.creators && <Avatar creator={v.creators} className="w-7 h-7 text-xs" />}
-        <Link href={handle ? `/c/${handle}` : '/map'} className="min-w-0 flex-1">
+        <Link href={handle ? `/c/${handle}` : '/'} className="min-w-0 flex-1">
           <span className="block text-xs sm:text-sm font-extrabold truncate">{v.creators?.display_name || handle}</span>
           <span className="block text-[11px] font-bold text-gray-500 truncate">{timeAgo(v.posted_at)}</span>
         </Link>

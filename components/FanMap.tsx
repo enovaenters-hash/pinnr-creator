@@ -103,6 +103,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
     let pubmap: Leaflet.Map | null = null;
     let onPlayerMessage: ((e: MessageEvent) => void) | null = null;
     let onFocus: ((e: Event) => void) | null = null;
+    let onDocClick: ((e: MouseEvent) => void) | null = null;
 
     (async () => {
       const L = (await import('leaflet')).default;
@@ -526,7 +527,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
 
       // Save a video to the signed-in fan's My Videos (sends signed-out visitors to sign in first).
       async function toggleSave(dbId: string, btn: HTMLElement) {
-        if (!userId) { window.location.href = `/login?next=${encodeURIComponent(`/map?focus=${dbId}`)}`; return; }
+        if (!userId) { window.location.href = `/login?next=${encodeURIComponent(`/?focus=${dbId}`)}`; return; }
         const was = savedSet.has(dbId);
         if (was) savedSet.delete(dbId); else savedSet.add(dbId);
         const paint = () => {
@@ -639,12 +640,28 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         if (play) startPlayer();
       };
       window.addEventListener('povgo:focus', onFocus);
+
+      // Home page: tapping a spot card elsewhere on the page (/?focus=<id>) opens it on this map without a reload.
+      if (home) {
+        onDocClick = (e: MouseEvent) => {
+          const a = (e.target as Element | null)?.closest?.('a[href^="/?focus="]') as HTMLAnchorElement | null;
+          if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          const id = new URL(a.href).searchParams.get('focus');
+          const place = id ? PUBSET.find((p) => p.videos.some((v) => v.dbId === id)) : undefined;
+          if (!id || !place) return; // not on the map (no pin): let the link load normally
+          e.preventDefault(); e.stopPropagation();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          selectPub(PUBSET.indexOf(place), id);
+        };
+        document.addEventListener('click', onDocClick, true); // capture: runs before the Link's own handler
+      }
     })();
 
     return () => {
       disposed = true;
       if (onPlayerMessage) window.removeEventListener('message', onPlayerMessage);
       if (onFocus) window.removeEventListener('povgo:focus', onFocus);
+      if (onDocClick) document.removeEventListener('click', onDocClick, true);
       pubmap?.remove(); pubmap = null;
     };
   }, [initialCreator, embedded, home, view, mine]);
@@ -656,13 +673,13 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
     return (
       <>
         <style>{FAN_CSS}</style>
-        {!home && !mine && <SiteNav active="map" />}
+        {!home && !mine && <SiteNav active="home" />}
         <div id="pub" className={home ? 'page home' : mine ? 'page mine' : 'page'}>
           <div className="pagewrap">
             <div className="pubbar">
               <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
               <div className="pubwho"><div className="nm" id="pubName">{mine ? 'All saved' : 'All Spots'}</div><div className="h" id="pubHandle">Loading…</div></div>
-              <a className="pubview" id="pubView" href="/map" hidden>View page</a>
+              <a className="pubview" id="pubView" href="/" hidden>View page</a>
               <select className="pubsel" id="pubCreator" aria-label={mine ? 'Choose list' : 'Choose creator'}><option>{mine ? 'All saved' : 'All creators'}</option></select>
             </div>
             <div className="pubmain">
@@ -694,9 +711,9 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           <span className="pubdiv" aria-hidden="true" />
           <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
           <div className="pubwho"><div className="nm" id="pubName">All Spots</div><div className="h" id="pubHandle">Loading…</div></div>
-          <NavLinks active="map" className="pubnav" />
+          <NavLinks className="pubnav" />
           <span className="pubbreak" aria-hidden="true" />
-          <a className="pubview" id="pubView" href="/map" hidden>View page</a>
+          <a className="pubview" id="pubView" href="/" hidden>View page</a>
           <select className="pubsel" id="pubCreator" aria-label="Choose creator"><option>All creators</option></select>
         </div>
         <div className="pubchips-wrapper">

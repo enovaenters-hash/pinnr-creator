@@ -9,7 +9,7 @@ export const TYPE_DOT: Record<string, string> = {
 export default function PosterTile({ video, rank, type }: { video: PublicVideo; rank?: number; type?: string }) {
   const handle = video.creators?.tiktok_username;
   return (
-    <Link href={`/map?focus=${video.id}`}
+    <Link href={`/?focus=${video.id}`}
       className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-ice to-frost aspect-[4/5] sm:aspect-[4/3] border-2 border-transparent hover:border-ice transition-colors">
       {video.cover_url && (
         <img src={video.cover_url} referrerPolicy="no-referrer" alt="" loading="lazy"

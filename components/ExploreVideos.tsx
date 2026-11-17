@@ -52,7 +52,7 @@ export default function ExploreVideos({ videos }: { videos: HomeVideo[] | null }
     <section className="mt-10" aria-labelledby="explore-videos">
       <div className="flex items-baseline justify-between mb-3">
         <h2 id="explore-videos" className="text-2xl font-semibold">Explore videos</h2>
-        <Link href="/map" className="text-sm font-bold text-glacier hover:underline">See all →</Link>
+        <Link href="/#explore" className="text-sm font-bold text-glacier hover:underline">See all →</Link>
       </div>
 
       <div role="group" aria-label="Category" className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -78,7 +78,7 @@ export default function ExploreVideos({ videos }: { videos: HomeVideo[] | null }
       </div>
 
       <div className="mt-5 flex justify-center">
-        <Link href="/map" className="btn-ghost px-7 py-3 text-sm">See all on the map</Link>
+        <Link href="/" className="btn-ghost px-7 py-3 text-sm">See all on the map</Link>
       </div>
     </section>
   );
