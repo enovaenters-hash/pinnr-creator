@@ -9,13 +9,13 @@ export default function Logo({ tone = 'onLight', className = 'h-8 w-auto' }: { t
   return (
     <svg viewBox="-2 0 218 60" className={className} role="img" aria-label="POVGo">
       <g transform="translate(2 4) scale(1.08)">
-        <path d={PIN_PATH} fill={onIce ? '#ffffff' : '#7fd4f2'}
+        <path d={PIN_PATH} fill={onIce ? '#ffffff' : '#2fa9e0'}
           {...(onIce ? { stroke: OUTLINE, strokeWidth: 2.6, strokeLinejoin: 'round' as const } : {})} />
-        <path d={PLAY_PATH} fill={onIce ? '#7fd4f2' : '#ffffff'} />
+        <path d={PLAY_PATH} fill={onIce ? '#2fa9e0' : '#ffffff'} />
       </g>
       <text x="60" y="44" fontFamily="var(--font-sora), Sora, sans-serif" fontSize="42" fontWeight="800" letterSpacing="-1.2">
         <tspan fill="#13293a">POV</tspan>
-        <tspan fill={onIce ? '#ffffff' : '#7fd4f2'}
+        <tspan fill={onIce ? '#ffffff' : '#2fa9e0'}
           {...(onIce ? { stroke: OUTLINE, strokeWidth: 2.8, strokeLinejoin: 'round' as const, paintOrder: 'stroke' } : {})}>Go</tspan>
       </text>
     </svg>

@@ -1,7 +1,7 @@
 // Layout ported 1:1 from the original fan map (keen-lollipop-93bfb2.netlify.app), recolored for
 // POVGo theme 06 (ice blue bar, sunny yellow actions, Fredoka + Nunito). Scoped to #pub.
 export const FAN_CSS = `
-  #pub{--ink:#13293a;--ink2:#4a6574;--muted:#5f7a89;--line:#d6e9f1;--bg:#f4fbfe;--panel:#fff;--accent:#ffd23f;--accent-ink:#13293a;--bar:#7fd4f2;--frost:#dff4fc;--glacier:#1c7fb0;--brand:#13293a;
+  #pub{--ink:#13293a;--ink2:#4a6574;--muted:#5f7a89;--line:#d6e9f1;--bg:#f4fbfe;--panel:#fff;--accent:#ffd23f;--accent-ink:#13293a;--bar:#2fa9e0;--frost:#dff4fc;--glacier:#1c7fb0;--brand:#13293a;
     --display:var(--font-fredoka),var(--font-nunito),system-ui,sans-serif;
     font-family:var(--font-nunito),system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink)}
   #pub *{box-sizing:border-box}
