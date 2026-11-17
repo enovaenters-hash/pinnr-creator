@@ -61,4 +61,4 @@ export function milesBetween(a: { lat: number; lng: number }, b: { lat: number; 
 export const formatMiles = (m: number) => (m < 10 ? `${m.toFixed(1)} mi` : `${Math.round(m)} mi`);
 
 /** Where tapping a video should go: the fan map focused on it, or TikTok if it has no pin. */
-export const videoHref = (v: FanVideo) => (v.lat !== null ? `/map?focus=${v.id}` : v.video_url ?? '#');
+export const videoHref = (v: FanVideo) => (v.lat !== null ? `/?focus=${v.id}` : v.video_url ?? '#');
