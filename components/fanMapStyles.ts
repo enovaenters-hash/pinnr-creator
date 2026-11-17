@@ -187,4 +187,22 @@ export const FAN_CSS = `
   #pub.page.home .pubbar,#pub.page.home .publist{display:none}
   #pub.page.home .pubmain{height:100%;min-height:0;max-height:none;position:relative}
   @media(min-width:761px){#pub.page.home .pubright{position:absolute;right:0;top:0;bottom:0;width:340px;min-width:340px;z-index:900}}
+  /* My Map (fan page): the same page layout, sitting inside the fan page's own container. */
+  #pub.page.mine .pagewrap{max-width:none;padding:0 0 8px}
+  #pub.page.mine .pubbar{padding-bottom:10px}
+  /* A shorter map keeps the list panel above the fold. */
+  #pub.page.mine .pubmain{height:min(50vh,500px);min-height:300px}
+  @media(max-width:760px){#pub.page.mine .pubmain{height:40vh;min-height:260px;max-height:420px}}
+  #pub.page .lpanel{margin-top:14px;background:#fff;border-radius:20px;box-shadow:0 6px 20px rgba(19,41,58,.07);padding:14px 16px;min-width:0}
+  #pub.page .lp-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}
+  #pub.page .lp-head h3{font-family:var(--display);font-weight:600;font-size:21px;line-height:1.2;margin:0;min-width:0;overflow-wrap:anywhere}
+  #pub.page .lp-n{font-size:12px;font-weight:800;color:var(--muted)}
+  #pub.page .lp-btns,#pub.page .lp-form,#pub.page .lp-confirm{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font-size:13px;font-weight:700}
+  #pub.page .lp-btn{font-family:inherit;font-size:13px;font-weight:800;color:var(--ink);background:#fff;border:0;border-radius:999px;padding:8px 14px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+  #pub.page .lp-btn.sun{background:var(--accent);box-shadow:0 2px 0 #f2c21a}
+  #pub.page .lp-btn.danger{background:#d92d20;color:#fff;box-shadow:none}
+  #pub.page .lp-form input{flex:1 1 180px;min-width:0;font-family:inherit;font-size:15px;padding:9px 14px;border:2px solid var(--line);border-radius:999px;outline:none}
+  #pub.page .lp-form input:focus{border-color:var(--bar);box-shadow:0 0 0 3px var(--frost)}
+  #pub.page .lp-hint{margin:10px 0 0;font-size:13px;font-weight:700;color:var(--muted)}
+  #pub.page .premove{margin-top:8px;font-family:inherit;font-size:12px;font-weight:800;color:var(--ink);background:#fff;border:0;border-radius:999px;padding:5px 12px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
 `;

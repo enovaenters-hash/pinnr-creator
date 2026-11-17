@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
-import { categoryColor, CONTENT_TYPES, creatorTypes } from '@/lib/types';
+import { CONTENT_TYPES, creatorTypes } from '@/lib/types';
 import {
   FAN_VIDEO_FIELDS, catLabel, cityOf, formatMiles, milesBetween, timeAgo, videoHref,
   type FanCreator, type FanList, type FanVideo, type SavedVideo,
@@ -12,9 +12,8 @@ import {
 import SiteNav from '@/components/SiteNav';
 import CreatorDashboard from '@/components/CreatorDashboard';
 import { NotConfigured } from '@/components/AuthCard';
-import type { MapPin } from '@/components/Map';
 
-const Map = dynamic(() => import('@/components/Map'), { ssr: false });
+const FanMap = dynamic(() => import('@/components/FanMap'), { ssr: false });
 
 type View = 'feed' | 'videos' | 'map' | 'creator';
 type Sort = 'new' | 'near' | 'creator' | 'az';
@@ -46,7 +45,6 @@ export default function FanPage() {
   const [lists, setLists] = useState<FanList[]>([]);
   const [sort, setSort] = useState<Sort>('new');
   const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
-  const [mapFilter, setMapFilter] = useState<string>('all');
   const [finding, setFinding] = useState(false);
   const [notice, setNotice] = useState('');
   const [discover, setDiscover] = useState<FanVideo[] | null>(null);
@@ -130,6 +128,24 @@ export default function FanPage() {
     })();
   }, [loadFeed, loadDiscover, locate]);
 
+  // The My Map view edits lists and saves on its own; pick up those changes so My Videos and the counts stay right.
+  useEffect(() => {
+    if (!uid) return;
+    const reload = async () => {
+      const supabase = getSupabase();
+      const [s, l] = await Promise.all([
+        supabase.from('saved_videos').select(`created_at, videos(${FAN_VIDEO_FIELDS})`).eq('user_id', uid).order('created_at', { ascending: false }),
+        supabase.from('lists').select('id, name, list_items(video_id)').eq('user_id', uid).order('created_at'),
+      ]);
+      setSaved(((s.data ?? []) as unknown as { created_at: string; videos: FanVideo | null }[])
+        .filter((r) => r.videos).map((r) => ({ savedAt: r.created_at, video: r.videos! })));
+      setLists(((l.data ?? []) as unknown as { id: string; name: string; list_items: { video_id: string }[] }[])
+        .map((r) => ({ id: r.id, name: r.name, videoIds: (r.list_items ?? []).map((i) => i.video_id) })));
+    };
+    window.addEventListener('povgo:lists-changed', reload);
+    return () => window.removeEventListener('povgo:lists-changed', reload);
+  }, [uid]);
+
   const savedIds = useMemo(() => new Set(saved.map((s) => s.video.id)), [saved]);
   const followIds = useMemo(() => new Set(follows.map((f) => f.id)), [follows]);
   const flash = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(''), 2500); };
@@ -172,15 +188,7 @@ export default function FanPage() {
     const { data, error } = await getSupabase().from('lists').insert({ user_id: uid, name: clean }).select('id, name').single();
     if (error || !data) { flash('Couldn’t create that list. Try again.'); return null; }
     setLists((ls) => [...ls, { id: data.id, name: data.name, videoIds: [] }]);
-    setMapFilter(data.id);
     return data.id;
-  }
-
-  async function deleteList(id: string) {
-    setLists((ls) => ls.filter((l) => l.id !== id));
-    if (mapFilter === id) setMapFilter('all');
-    const { error } = await getSupabase().from('lists').delete().eq('id', id);
-    if (error) flash('Couldn’t delete that list. Refresh and try again.');
   }
 
   async function toggleListItem(listId: string, videoId: string) {
@@ -254,14 +262,6 @@ export default function FanPage() {
     if (sort === 'az') return '';
     return `Saved ${timeAgo(s.savedAt).toLowerCase()}`;
   };
-  const inList = (l: FanList) => saved.filter((s) => l.videoIds.includes(s.video.id));
-  const mapList = lists.find((l) => l.id === mapFilter);
-  const onMap = (mapList ? inList(mapList) : saved).filter((s) => s.video.lat !== null && s.video.lng !== null);
-  const pins: MapPin[] = onMap.map(({ video: v }) => ({
-    id: v.id, lat: v.lat!, lng: v.lng!, title: v.place_name || 'Saved spot', subtitle: v.address,
-    cover: v.cover_url, href: v.video_url, color: categoryColor(v.category),
-  }));
-
   return (
     <>
       <SiteNav active="login" />
@@ -396,49 +396,8 @@ export default function FanPage() {
           )}
 
           {view === 'map' && (
-            <section>
-              <h2 className="text-xl font-semibold mb-3 flex items-baseline gap-2">My map
-                <span className="text-xs font-bold text-gray-500 font-sans">
-                  {mapList ? `${mapList.name} · ` : ''}{onMap.length} saved location{onMap.length === 1 ? '' : 's'}</span></h2>
-              {onMap.length === 0 ? (
-                <Empty>{saved.length ? 'None of these saved videos has a location on the map yet.' : 'Save a few videos and their locations will show up here.'}</Empty>
-              ) : (
-                <div className="h-[55vh] sm:h-[28rem] rounded-xl overflow-hidden border-2 border-white shadow-[0_6px_20px_rgba(19,41,58,.07)] relative z-0">
-                  <Map pins={pins} />
-                </div>
-              )}
-
-              <h2 className="text-xl font-semibold mt-8 mb-3 flex items-baseline gap-2">My lists
-                <span className="text-xs font-bold text-gray-500 font-sans">tap a list to show it on the map</span></h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                <ListTile name="All saved" items={saved} selected={!mapList} onClick={() => setMapFilter('all')} />
-                {lists.map((l) => (
-                  <ListTile key={l.id} name={l.name} items={inList(l)} selected={mapFilter === l.id} onClick={() => setMapFilter(l.id)} />
-                ))}
-                <NewListCard onCreate={createList} />
-              </div>
-
-              {mapList ? (
-                <ListDetail key={mapList.id} list={mapList} items={inList(mapList)}
-                  onRemove={(id) => toggleListItem(mapList.id, id)} onDelete={() => deleteList(mapList.id)} />
-              ) : (
-                <div>
-                  <h3 className="text-xl font-semibold mb-3 flex items-baseline gap-2">All saved
-                    <span className="text-xs font-bold text-gray-500 font-sans">{saved.length} spot{saved.length === 1 ? '' : 's'}</span></h3>
-                  {saved.length === 0 ? (
-                    <Empty>Nothing saved yet. Tap the heart on any video, then group your favorites into a list like “Date night”.</Empty>
-                  ) : (
-                    <>
-                      {lists.length === 0 && <p className="text-sm text-gray-600 mb-3">Make a list above, then add videos to it from <button type="button" className="font-extrabold text-glacier underline" onClick={() => go('videos')}>My Videos</button>.</p>}
-                      <ul className="grid grid-cols-[minmax(0,1fr)] gap-2">
-                        {saved.map(({ video: v }) => (
-                          <li key={v.id}><Row video={v} right={<Link href={videoHref(v)} className="btn-sun px-3 py-1.5 text-xs shrink-0">Open</Link>} /></li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                </div>
-              )}
+            <section aria-label="My map">
+              <FanMap mine />
             </section>
           )}
 
@@ -532,24 +491,6 @@ function Heart({ on, onClick, name }: { on: boolean; onClick: () => void; name: 
   );
 }
 
-function Row({ video: v, right }: { video: FanVideo; right?: React.ReactNode }) {
-  return (
-    <div className="card p-2 flex items-center gap-3">
-      <span className="relative w-12 h-12 rounded-xl overflow-hidden bg-frost shrink-0">
-        {v.cover_url && <img src={v.cover_url} referrerPolicy="no-referrer" alt=""
-          onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} className="absolute inset-0 w-full h-full object-cover" />}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-display font-semibold text-sm truncate">{v.place_name || 'Spot'}</span>
-        <span className="block text-xs font-bold text-gray-500 truncate">
-          {[catLabel(v.category), cityOf(v.address), v.creators ? `@${v.creators.tiktok_username}` : ''].filter(Boolean).join(' · ')}
-        </span>
-      </span>
-      {right}
-    </div>
-  );
-}
-
 function SavedCard({ item, tag, lists, onUnsave, onToggleList, onNewList }: {
   item: SavedVideo; tag: string; lists: FanList[];
   onUnsave: () => void; onToggleList: (listId: string, videoId: string) => void; onNewList: (name: string) => Promise<string | null>;
@@ -591,71 +532,6 @@ function SavedCard({ item, tag, lists, onUnsave, onToggleList, onNewList }: {
         </div>
       )}
     </article>
-  );
-}
-
-/** One tile in the lists grid: a 2x2 collage of covers, the name and the spot count. */
-function ListTile({ name, items, selected, onClick }: { name: string; items: SavedVideo[]; selected: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={selected}
-      className={`card p-2 text-left grid grid-cols-[minmax(0,1fr)] gap-1.5 content-start min-w-0 ${selected ? 'ring-4 ring-sun' : ''}`}>
-      <span className="grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden bg-frost aspect-square">
-        {[0, 1, 2, 3].map((i) => (
-          <span key={i} className="relative bg-frost">
-            {items[i]?.video.cover_url && <img src={items[i].video.cover_url!} referrerPolicy="no-referrer" alt=""
-              onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} className="absolute inset-0 w-full h-full object-cover" />}
-          </span>
-        ))}
-      </span>
-      <span className="font-display font-semibold truncate px-1">{name}</span>
-      <span className="text-xs font-bold text-gray-500 px-1 pb-1">{items.length} spot{items.length === 1 ? '' : 's'}</span>
-    </button>
-  );
-}
-
-function NewListCard({ onCreate }: { onCreate: (name: string) => Promise<string | null> }) {
-  const [name, setName] = useState('');
-  return (
-    <form onSubmit={async (e) => { e.preventDefault(); if (await onCreate(name)) setName(''); }}
-      className="rounded-xl border-2 border-dashed border-gray-400 p-3 grid grid-cols-[minmax(0,1fr)] gap-2 content-center min-h-[9rem] min-w-0">
-      <label htmlFor="new-list-name" className="text-sm font-extrabold text-gray-600 text-center">+ New list</label>
-      <input id="new-list-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Date night" maxLength={60}
-        className="min-w-0 w-full px-3 py-2 text-sm rounded-full border-2 border-gray-200 bg-white focus:outline-none focus:border-ice" />
-      <button className="btn-sun py-2 text-sm" disabled={!name.trim()}>Create</button>
-    </form>
-  );
-}
-
-function ListDetail({ list, items, onRemove, onDelete }: {
-  list: FanList; items: SavedVideo[]; onRemove: (videoId: string) => void; onDelete: () => void;
-}) {
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <h3 className="text-xl font-semibold mr-auto flex items-baseline gap-2">{list.name}
-          <span className="text-xs font-bold text-gray-500 font-sans">{items.length} spot{items.length === 1 ? '' : 's'}</span></h3>
-        {confirming ? (
-          <>
-            <span className="text-xs font-bold text-gray-600">Delete this list?</span>
-            <button type="button" onClick={onDelete} className="px-3 py-1.5 text-xs font-extrabold rounded-full bg-red-600 text-white">Delete</button>
-            <button type="button" onClick={() => setConfirming(false)} className="btn-ghost px-3 py-1.5 text-xs">Keep</button>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={() => setConfirming(true)} className="btn-ghost px-3 py-1.5 text-xs">Delete list</button>
-          </>
-        )}
-      </div>
-      {items.length === 0 && <Empty>This list is empty. Open My Videos and tap “+ List” on a video to add it here.</Empty>}
-      <ul className="grid grid-cols-[minmax(0,1fr)] gap-2">
-        {items.map(({ video: v }) => (
-          <li key={v.id}>
-            <Row video={v} right={<button type="button" onClick={() => onRemove(v.id)} className="btn-ghost px-3 py-1.5 text-xs shrink-0">Remove</button>} />
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 

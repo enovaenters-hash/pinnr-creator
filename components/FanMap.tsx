@@ -84,8 +84,13 @@ function groupPlaces(rows: Row[]): { places: Place[]; creators: CreatorInfo[] } 
  * only `initialCreator`'s spots are shown, and other parts of the page can open a spot by firing
  * `window.dispatchEvent(new CustomEvent('povgo:focus', { detail: { id: <video id>, play: true } }))`.
  */
-export default function FanMap({ initialCreator = null, embedded = false, home = false, view = null }: {
+export default function FanMap({ initialCreator = null, embedded = false, home = false, view = null, mine = false }: {
   initialCreator?: string | null; embedded?: boolean;
+  /**
+   * "My Map" on the fan page: same layout as /map, but it shows only the signed-in fan's saved videos and the
+   * dropdown picks one of their lists ("All saved" or a list). A panel under the map edits the chosen list.
+   */
+  mine?: boolean;
   /** Home-page map: just the map and its video panel (no bar, search or list), same pins and behaviour as /map. */
   home?: boolean;
   /** Fixed starting view (e.g. Phoenix) instead of fitting every pin. */
@@ -101,10 +106,36 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
 
     (async () => {
       const L = (await import('leaflet')).default;
-      const { data } = await getSupabase().from('videos')
-        .select('id, tiktok_id, posted_at, place_name, category, address, lat, lng, discount_code, featured, cover_url, creator_id, creators(tiktok_username, display_name, avatar_url)')
-        .eq('hidden', false).not('lat', 'is', null)
-        .order('posted_at', { ascending: false }).limit(5000);
+      const ROW_FIELDS = 'id, tiktok_id, posted_at, place_name, category, address, lat, lng, discount_code, featured, cover_url, creator_id, creators(tiktok_username, display_name, avatar_url)';
+      type MineList = { id: string; name: string; ids: Set<string> };
+      let data: unknown[] | null = null;
+      const LISTS: MineList[] = [];
+      let mineUser: string | null = null;
+      if (mine) {
+        // Only this fan's saved videos, plus their lists.
+        const sb = getSupabase();
+        const { data: { session } } = await sb.auth.getSession();
+        mineUser = session?.user.id ?? null;
+        if (mineUser) {
+          const [sv, ls] = await Promise.all([
+            sb.from('saved_videos').select('video_id').eq('user_id', mineUser),
+            sb.from('lists').select('id, name, list_items(video_id)').eq('user_id', mineUser).order('created_at'),
+          ]);
+          ((ls.data ?? []) as unknown as { id: string; name: string; list_items: { video_id: string }[] }[])
+            .forEach((r) => LISTS.push({ id: r.id, name: r.name, ids: new Set((r.list_items ?? []).map((i) => i.video_id)) }));
+          const ids = (sv.data ?? []).map((r) => r.video_id as string);
+          if (ids.length) {
+            const res = await sb.from('videos').select(ROW_FIELDS).in('id', ids).eq('hidden', false).not('lat', 'is', null)
+              .order('posted_at', { ascending: false });
+            data = res.data;
+          }
+        }
+      } else {
+        const res = await getSupabase().from('videos').select(ROW_FIELDS)
+          .eq('hidden', false).not('lat', 'is', null)
+          .order('posted_at', { ascending: false }).limit(5000);
+        data = res.data;
+      }
       if (disposed) return;
 
       // Who is signed in, and which videos they've already saved (for the Save button).
@@ -150,10 +181,111 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const h = sel.value || null;
         const url = new URL(window.location.href);
         url.searchParams.delete('focus');
-        if (h) url.searchParams.set('creator', h); else url.searchParams.delete('creator');
+        if (mine) { if (h) url.searchParams.set('list', h); else url.searchParams.delete('list'); }
+        else if (h) url.searchParams.set('creator', h); else url.searchParams.delete('creator');
         window.history.replaceState(null, '', url);
-        openPub(h);
+        if (mine) openMine(h); else openPub(h);
       };
+
+      // ── My Map: the dropdown is the fan's lists, and a panel under the map edits the chosen one ──
+      const savedPlaces = (ids: Set<string> | null): Place[] => ids
+        ? ALL.map((p) => ({ ...p, videos: p.videos.filter((v) => ids.has(v.dbId)) })).filter((p) => p.videos.length)
+        : ALL;
+      const spotWord = (n: number) => `${n} spot${n === 1 ? '' : 's'}`;
+      let lpMode: 'idle' | 'rename' | 'new' | 'delete' = 'idle';
+      let lpBusy = false;
+      const changed = () => window.dispatchEvent(new CustomEvent('povgo:lists-changed'));
+      function fillListSelect() {
+        sel.innerHTML = `<option value="">All saved (${new Set(ALL.flatMap((p) => p.videos.map((v) => v.dbId))).size})</option>` +
+          LISTS.map((l) => `<option value="${esc(l.id)}">${esc(l.name)} · ${l.ids.size}</option>`).join('');
+        sel.value = CUR ?? '';
+      }
+      function openMine(id: string | null) {
+        const l = id ? LISTS.find((x) => x.id === id) : undefined;
+        CUR = l ? l.id : null;
+        combinedMode = true; ACCENT = SUN;
+        $('pub').style.setProperty('--accent', ACCENT);
+        PUBSET = savedPlaces(l ? l.ids : null);
+        lpMode = 'idle';
+        fillListSelect();
+        $('pubPfp').innerHTML = HOME_PIN;
+        $('pubName').textContent = l ? l.name : 'All saved';
+        $('pubHandle').textContent = `${spotWord(PUBSET.length)} · tap a pin to watch`;
+        showPub();
+        renderListPanel();
+      }
+      function renderListPanel() {
+        const el = document.getElementById('pubListEdit'); if (!el) return;
+        const l = CUR ? LISTS.find((x) => x.id === CUR) : undefined;
+        const title = l ? l.name : 'All saved';
+        let body = '';
+        if (lpMode === 'rename' && l) {
+          body = `<form class="lp-form" data-lp-form="rename"><input name="n" value="${esc(l.name)}" maxlength="60" aria-label="List name" autocomplete="off">
+            <button class="lp-btn sun" type="submit">Save</button><button class="lp-btn" type="button" data-lp="cancel">Cancel</button></form>`;
+        } else if (lpMode === 'new') {
+          body = `<form class="lp-form" data-lp-form="new"><input name="n" placeholder="Date night" maxlength="60" aria-label="New list name" autocomplete="off">
+            <button class="lp-btn sun" type="submit">Create</button><button class="lp-btn" type="button" data-lp="cancel">Cancel</button></form>`;
+        } else if (lpMode === 'delete' && l) {
+          body = `<div class="lp-confirm">Delete “${esc(l.name)}”? Its spots stay saved.
+            <button class="lp-btn danger" type="button" data-lp="delete-yes">Delete</button><button class="lp-btn" type="button" data-lp="cancel">Keep</button></div>`;
+        } else {
+          body = `<div class="lp-btns">${l ? `<button class="lp-btn" type="button" data-lp="rename">Rename</button><button class="lp-btn" type="button" data-lp="delete">Delete list</button>` : ''}
+            <button class="lp-btn sun" type="button" data-lp="new">+ New list</button></div>`;
+        }
+        const hint = !l && lpMode === 'idle'
+          ? `<p class="lp-hint">${LISTS.length ? 'Pick a list from the menu at the top to edit it.' : 'Make a list like “Date night”, then add videos to it from My Videos.'}</p>` : '';
+        const empty = l && !PUBSET.length ? `<p class="lp-hint">This list is empty. Open My Videos and tap “+ List” on a video to add it here.</p>` : '';
+        el.innerHTML = `<div class="lp-head"><h3>${esc(title)}</h3><span class="lp-n">${spotWord(PUBSET.length)}</span></div>${body}${hint}${empty}`;
+        el.querySelector('input')?.focus();
+      }
+      document.getElementById('pubListEdit')?.addEventListener('click', async (e) => {
+        const t = (e.target as HTMLElement).closest('[data-lp]') as HTMLElement | null;
+        if (!t || lpBusy) return;
+        const a = t.dataset.lp;
+        if (a === 'rename' || a === 'new' || a === 'delete') { lpMode = a; renderListPanel(); return; }
+        if (a === 'cancel') { lpMode = 'idle'; renderListPanel(); return; }
+        if (a === 'delete-yes' && CUR) {
+          lpBusy = true;
+          const id = CUR;
+          const { error } = await getSupabase().from('lists').delete().eq('id', id);
+          lpBusy = false;
+          if (error) return;
+          LISTS.splice(LISTS.findIndex((x) => x.id === id), 1);
+          const url = new URL(window.location.href); url.searchParams.delete('list'); window.history.replaceState(null, '', url);
+          openMine(null); changed();
+        }
+      });
+      document.getElementById('pubListEdit')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        const name = ((form.elements.namedItem('n') as HTMLInputElement).value || '').trim().slice(0, 60);
+        if (!name || lpBusy || !mineUser) return;
+        lpBusy = true;
+        const sb = getSupabase();
+        if (form.dataset.lpForm === 'rename' && CUR) {
+          const l = LISTS.find((x) => x.id === CUR)!;
+          const { error } = await sb.from('lists').update({ name }).eq('id', CUR);
+          lpBusy = false;
+          if (error) return;
+          l.name = name; openMine(CUR); changed();
+        } else {
+          const { data: row, error } = await sb.from('lists').insert({ user_id: mineUser, name }).select('id, name').single();
+          lpBusy = false;
+          if (error || !row) return;
+          LISTS.push({ id: row.id as string, name: row.name as string, ids: new Set() });
+          const url = new URL(window.location.href); url.searchParams.set('list', row.id as string); window.history.replaceState(null, '', url);
+          openMine(row.id as string); changed();
+        }
+      });
+      // "Remove" on a card takes that place out of the chosen list (it stays saved).
+      async function removeFromList(p: Place) {
+        const l = LISTS.find((x) => x.id === CUR); if (!l) return;
+        const vids = p.videos.map((v) => v.dbId);
+        const { error } = await getSupabase().from('list_items').delete().eq('list_id', l.id).in('video_id', vids);
+        if (error) return;
+        vids.forEach((v) => l.ids.delete(v));
+        openMine(l.id); changed();
+      }
 
       function openPub(handle: string | null) {
         const c = handle ? CREATORS.find((x) => x.handle === handle) : undefined;
@@ -228,7 +360,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         });
         $('pubRight').innerHTML = PUBSET.length
           ? `<div class="empty"><div class="big">👈</div>Pick a place from the list — or a pin on the map — to watch its video right here.</div>`
-          : `<div class="empty"><div class="big">📍</div>No spots on the map yet.</div>`;
+          : `<div class="empty"><div class="big">📍</div>${mine ? 'Nothing here yet. Save a video and it will show up on this map.' : 'No spots on the map yet.'}</div>`;
         $('pubRight').classList.remove('show'); $('pubLeft').classList.remove('expanded');
         renderPubList();
         setTimeout(() => { pubmap!.invalidateSize(); applyPubFilter(true); }, 60);
@@ -386,6 +518,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           ? await supabase.from('saved_videos').delete().eq('user_id', userId).eq('video_id', dbId)
           : await supabase.from('saved_videos').insert({ user_id: userId, video_id: dbId });
         if (error) { if (was) savedSet.add(dbId); else savedSet.delete(dbId); paint(); }
+        else if (mine) window.dispatchEvent(new CustomEvent('povgo:lists-changed'));
       }
 
       // Clicks inside the player panel (clip nav, date buttons, back, collapse, reload).
@@ -426,8 +559,11 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           const card = document.createElement('div'); card.className = 'pcard' + (i === pubSel ? ' on' : ''); card.dataset.i = String(i);
           card.innerHTML = `<h4>${esc(p.name)}</h4>
             ${combinedMode ? `<div class="by"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a></div>` : ''}
-            <div class="mt"><span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}</div>`;
+            <div class="mt"><span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}</div>
+            ${mine && CUR ? '<button class="premove" type="button">Remove from list</button>' : ''}`;
           card.onclick = () => selectPub(i, undefined, true);
+          const rm = card.querySelector('.premove') as HTMLElement | null;
+          if (rm) rm.onclick = (ev) => { ev.stopPropagation(); removeFromList(p); };
           el.appendChild(card);
         });
       }
@@ -466,8 +602,11 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       let start = CREATORS.some((c) => c.handle === want) ? want : null;
       const focusPlace = focusId ? ALL.find((p) => p.videos.some((v) => v.dbId === focusId)) : undefined;
       if (focusPlace && start && focusPlace.creator !== start && !embedded) start = null;
-      openPub(start);
-      if (focusPlace && PUBSET.includes(focusPlace)) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
+      if (mine) {
+        const wantList = params.get('list');
+        openMine(wantList && LISTS.some((l) => l.id === wantList) ? wantList : null);
+      } else openPub(start);
+      if (!mine && focusPlace && PUBSET.includes(focusPlace)) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
 
       // Other parts of the page (the creator page's top 3) can open a spot here.
       onFocus = (e: Event) => {
@@ -486,7 +625,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (onFocus) window.removeEventListener('povgo:focus', onFocus);
       pubmap?.remove(); pubmap = null;
     };
-  }, [initialCreator, embedded, home, view]);
+  }, [initialCreator, embedded, home, view, mine]);
 
   if (!supabaseConfigured) return <p className="p-6 text-sm">Supabase isn&apos;t connected yet.</p>;
 
@@ -495,19 +634,20 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
     return (
       <>
         <style>{FAN_CSS}</style>
-        {!home && <SiteNav active="map" />}
-        <div id="pub" className={home ? 'page home' : 'page'}>
+        {!home && !mine && <SiteNav active="map" />}
+        <div id="pub" className={home ? 'page home' : mine ? 'page mine' : 'page'}>
           <div className="pagewrap">
             <div className="pubbar">
               <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
-              <div className="pubwho"><div className="nm" id="pubName">All Spots</div><div className="h" id="pubHandle">Loading…</div></div>
+              <div className="pubwho"><div className="nm" id="pubName">{mine ? 'All saved' : 'All Spots'}</div><div className="h" id="pubHandle">Loading…</div></div>
               <a className="pubview" id="pubView" href="/map" hidden>View page</a>
-              <select className="pubsel" id="pubCreator" aria-label="Choose creator"><option>All creators</option></select>
+              <select className="pubsel" id="pubCreator" aria-label={mine ? 'Choose list' : 'Choose creator'}><option>{mine ? 'All saved' : 'All creators'}</option></select>
             </div>
             <div className="pubmain">
               <div id="pubmap"><div className="pubload" id="pubLoading">Loading map…</div></div>
               <aside className="pubright" id="pubRight" />
             </div>
+            {mine && <section className="lpanel" id="pubListEdit" aria-label="Current list" />}
             <section className="publist" id="pubLeft" aria-label="Places">
               <div className="srch"><input id="pubSearch" type="search" placeholder="Search places…" autoComplete="off" /></div>
               <div className="pubchips-wrapper">
