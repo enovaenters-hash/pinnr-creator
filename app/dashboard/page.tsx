@@ -1,8 +1,11 @@
 'use client';
 
-import CreatorDashboard from '@/components/CreatorDashboard';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-/** Creator dashboard page. The same dashboard also sits inside the fan page's Creator tab. */
+/** The creator dashboard now lives in My Spots on the fan page; old links and bookmarks land there. */
 export default function DashboardPage() {
-  return <CreatorDashboard />;
+  const router = useRouter();
+  useEffect(() => { router.replace('/fan?view=myspots'); }, [router]);
+  return <main className="flex-1 flex items-center justify-center text-sm text-gray-500">Taking you to My Spots…</main>;
 }
