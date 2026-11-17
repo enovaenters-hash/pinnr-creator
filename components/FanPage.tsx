@@ -15,29 +15,34 @@ import { NotConfigured } from '@/components/AuthCard';
 
 const FanMap = dynamic(() => import('@/components/FanMap'), { ssr: false });
 
-type View = 'feed' | 'videos' | 'map' | 'creator';
+/** Three main parts: Explore (the public home page, unchanged), Following and My Spots. */
+type View = 'following' | 'myspots';
+/** Inside Following: newest from your creators, a map of their spots (plus your lists), and your saved videos. */
+type FTab = 'latest' | 'map' | 'saved';
 type Sort = 'new' | 'near' | 'creator' | 'az';
 
-const VIEWS: { key: View; label: string; icon: React.ReactNode }[] = [
-  { key: 'feed', label: 'Feed', icon: <><rect x="4" y="4" width="16" height="6" rx="2" /><rect x="4" y="13" width="16" height="7" rx="2" /></> },
-  { key: 'videos', label: 'My Videos', icon: <><rect x="3.5" y="4.5" width="17" height="15" rx="4" /><path d="M10 8.8L15.5 12L10 15.2Z" fill="#fff" /></> },
-  { key: 'map', label: 'My Map', icon: <><path d="M12 21.5C12 21.5 4.5 14.5 4.5 9.5A7.5 7.5 0 0 1 19.5 9.5C19.5 14.5 12 21.5 12 21.5Z" /><circle cx="12" cy="9.5" r="2.6" fill="#fff" /></> },
-  { key: 'creator', label: 'Creator', icon: <><circle cx="12" cy="8" r="4" /><path d="M4 20.5C4 16 7.6 13.5 12 13.5C16.4 13.5 20 16 20 20.5Z" /></> },
+const NAV: { key: 'explore' | View; label: string; icon: React.ReactNode; href?: string }[] = [
+  { key: 'explore', label: 'Explore', href: '/', icon: <><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M15.8 8.2L13.6 13.6L8.2 15.8L10.4 10.4Z" /></> },
+  { key: 'following', label: 'Following', icon: <path d="M12 20.8C4.8 15.7 3 12.4 3 9.2A4.9 4.9 0 0 1 12 6.6 4.9 4.9 0 0 1 21 9.2C21 12.4 19.2 15.7 12 20.8Z" /> },
+  { key: 'myspots', label: 'My Spots', icon: <><path d="M12 21.5C12 21.5 4.5 14.5 4.5 9.5A7.5 7.5 0 0 1 19.5 9.5C19.5 14.5 12 21.5 12 21.5Z" /><circle cx="12" cy="9.5" r="2.6" fill="#fff" /></> },
+];
+const FTABS: { key: FTab; label: string }[] = [
+  { key: 'latest', label: 'Latest' }, { key: 'map', label: 'Map' }, { key: 'saved', label: 'Saved' },
 ];
 const SORTS: { key: Sort; label: string }[] = [
   { key: 'new', label: 'Newest saved' }, { key: 'near', label: 'Closest' },
   { key: 'creator', label: 'Creator' }, { key: 'az', label: 'A to Z' },
 ];
-const isView = (v: string | null): v is View => VIEWS.some((x) => x.key === v);
 
 /**
- * The signed-in fan's page: Feed (creators you follow), My Videos (saved, sortable), My Map (saved
- * locations, with the fan's lists under the map) and Creator (your own videos, via the creator dashboard).
+ * The signed-in page: Following (Latest from creators you follow, a Map of their spots and your lists, and
+ * your Saved videos) and My Spots (your own synced spots, via the creator dashboard). Explore links to the home page.
  */
 export default function FanPage() {
   const [uid, setUid] = useState<string | null | undefined>(undefined); // undefined = checking
   const [name, setName] = useState('');
-  const [view, setView] = useState<View>('feed');
+  const [view, setView] = useState<View>('following');
+  const [ftab, setFtab] = useState<FTab>('latest');
   const [follows, setFollows] = useState<FanCreator[]>([]);
   const [creators, setCreators] = useState<FanCreator[]>([]);
   const [feed, setFeed] = useState<FanVideo[] | null>(null);
@@ -50,10 +55,12 @@ export default function FanPage() {
   const [discover, setDiscover] = useState<FanVideo[] | null>(null);
   const [dtypes, setDtypes] = useState<string[]>([]); // chosen discover types; empty = All
 
-  const go = useCallback((v: View) => {
-    setView(v);
+  const go = useCallback((v: View, t: FTab = 'latest') => {
+    setView(v); setFtab(t);
     const url = new URL(window.location.href);
-    if (v === 'feed') url.searchParams.delete('view'); else url.searchParams.set('view', v);
+    if (v === 'following') url.searchParams.delete('view'); else url.searchParams.set('view', v);
+    if (v === 'following' && t !== 'latest') url.searchParams.set('tab', t); else url.searchParams.delete('tab');
+    url.searchParams.delete('list');
     window.history.replaceState(null, '', url);
     window.scrollTo({ top: 0 });
   }, []);
@@ -87,9 +94,13 @@ export default function FanPage() {
 
   useEffect(() => {
     if (!supabaseConfigured) return;
-    const wanted = new URLSearchParams(window.location.search).get('view');
-    if (isView(wanted)) setView(wanted);
-    else if (wanted === 'lists') setView('map'); // lists now live under the map
+    // Older links: ?view=creator -> My Spots, ?view=videos -> Saved, ?view=map or lists -> Map.
+    const q = new URLSearchParams(window.location.search);
+    const wanted = q.get('view'), wantedTab = q.get('tab');
+    if (wanted === 'myspots' || wanted === 'creator') setView('myspots');
+    else if (wanted === 'videos') setFtab('saved');
+    else if (wanted === 'map' || wanted === 'lists' || q.get('list')) setFtab('map');
+    else if (wantedTab === 'map' || wantedTab === 'saved') setFtab(wantedTab);
     const supabase = getSupabase();
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -128,7 +139,7 @@ export default function FanPage() {
     })();
   }, [loadFeed, loadDiscover, locate]);
 
-  // The My Map view edits lists and saves on its own; pick up those changes so My Videos and the counts stay right.
+  // The Following map edits lists and saves on its own; pick up those changes so the Saved tab and the counts stay right.
   useEffect(() => {
     if (!uid) return;
     const reload = async () => {
@@ -164,7 +175,7 @@ export default function FanPage() {
       setSaved((xs) => [{ savedAt: new Date().toISOString(), video: v }, ...xs]);
       const { error } = await supabase.from('saved_videos').insert({ user_id: uid, video_id: v.id });
       if (error) { setSaved((xs) => xs.filter((x) => x.video.id !== v.id)); flash('Couldn’t save that. Try again.'); }
-      else flash('Saved to My Videos');
+      else flash('Saved');
     }
   }
 
@@ -228,10 +239,10 @@ export default function FanPage() {
         <SiteNav active="login" />
         <main className="flex-1 flex items-center justify-center px-4 py-12 bg-cloud">
           <div className="card p-7 w-full max-w-sm text-center">
-            <h1 className="text-2xl font-semibold text-ink">Your POVGo fan page</h1>
-            <p className="text-sm text-gray-600 mt-2">Follow creators, save the videos you want to try, group them into lists and see them all on your own map.</p>
+            <h1 className="text-2xl font-semibold text-ink">Your POVGo</h1>
+            <p className="text-sm text-gray-600 mt-2">Follow creators, save the places you want to try, group them into lists and see them all on a map. Post your own spots too.</p>
             <div className="mt-6 grid gap-2">
-              <Link href="/signup?as=fan" className="btn-sun py-3 text-sm">Create a fan account</Link>
+              <Link href="/signup" className="btn-sun py-3 text-sm">Join POVGo</Link>
               <Link href="/login?next=/fan" className="btn-ghost py-3 text-sm">Sign in</Link>
               <Link href="/map" className="text-sm font-bold text-glacier hover:underline mt-1">Just explore the map →</Link>
             </div>
@@ -276,16 +287,25 @@ export default function FanPage() {
               </p>
             </div>
             <nav aria-label="Fan page" className="hidden sm:flex gap-1.5 ml-auto">
-              {VIEWS.map((v) => (
-                <button key={v.key} type="button" onClick={() => go(v.key)} aria-current={view === v.key ? 'page' : undefined}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-extrabold rounded-full whitespace-nowrap ${view === v.key ? 'btn-sun' : 'btn-ghost'}`}>
-                  <NavIcon>{v.icon}</NavIcon>{v.label}
-                </button>
-              ))}
+              {NAV.map((v) => {
+                const cls = `inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-extrabold rounded-full whitespace-nowrap ${view === v.key ? 'btn-sun' : 'btn-ghost'}`;
+                return v.href
+                  ? <Link key={v.key} href={v.href} className={cls}><NavIcon>{v.icon}</NavIcon>{v.label}</Link>
+                  : <button key={v.key} type="button" onClick={() => go(v.key as View)} aria-current={view === v.key ? 'page' : undefined} className={cls}><NavIcon>{v.icon}</NavIcon>{v.label}</button>;
+              })}
             </nav>
           </header>
 
-          {view === 'feed' && (
+          {view === 'following' && (
+            <div className="flex gap-1.5 mb-5 p-1 rounded-full bg-frost w-fit max-w-full overflow-x-auto" role="group" aria-label="Following">
+              {FTABS.map((t) => (
+                <button key={t.key} type="button" onClick={() => go('following', t.key)} aria-pressed={ftab === t.key}
+                  className={`px-4 py-1.5 text-sm font-extrabold rounded-full whitespace-nowrap ${ftab === t.key ? 'bg-white shadow-sm text-ink' : 'text-gray-600'}`}>{t.label}</button>
+              ))}
+            </div>
+          )}
+
+          {view === 'following' && ftab === 'latest' && (
             <section>
               <div className="flex gap-3 overflow-x-auto pb-2 mb-4">
                 {follows.map((c) => (
@@ -367,12 +387,12 @@ export default function FanPage() {
             </section>
           )}
 
-          {view === 'videos' && (
+          {view === 'following' && ftab === 'saved' && (
             <section>
-              <h2 className="text-xl font-semibold mb-3 flex items-baseline gap-2">My videos
+              <h2 className="text-xl font-semibold mb-3 flex items-baseline gap-2">Saved videos
                 <span className="text-xs font-bold text-gray-500 font-sans">{saved.length} saved from creators</span></h2>
               {saved.length === 0 ? (
-                <Empty>Nothing saved yet. Tap the heart on any video in your <button type="button" className="font-extrabold text-glacier underline" onClick={() => go('feed')}>Feed</button> or on the <Link href="/map" className="font-extrabold text-glacier underline">Map</Link>.</Empty>
+                <Empty>Nothing saved yet. Tap the heart on any video in your <button type="button" className="font-extrabold text-glacier underline" onClick={() => go('following')}>Latest</button> or on the <Link href="/map" className="font-extrabold text-glacier underline">Map</Link>.</Empty>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-1.5 mb-4" role="group" aria-label="Sort my videos">
@@ -395,24 +415,24 @@ export default function FanPage() {
             </section>
           )}
 
-          {view === 'map' && (
-            <section aria-label="My map">
+          {view === 'following' && ftab === 'map' && (
+            <section aria-label="Following map">
               <FanMap mine />
             </section>
           )}
 
-          {view === 'creator' && <CreatorDashboard embedded />}
+          {view === 'myspots' && <CreatorDashboard embedded />}
         </div>
       </main>
 
       {/* Navigation along the bottom on a phone */}
-      <nav aria-label="Fan page" className="sm:hidden fixed inset-x-0 bottom-0 z-[1090] bg-white border-t border-gray-200 grid grid-cols-4 px-1 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
-        {VIEWS.map((v) => (
-          <button key={v.key} type="button" onClick={() => go(v.key)} aria-current={view === v.key ? 'page' : undefined}
-            className={`grid justify-items-center gap-0.5 py-1.5 rounded-2xl text-[10px] font-extrabold leading-tight ${view === v.key ? 'bg-sun-soft text-ink' : 'text-gray-500'}`}>
-            <NavIcon className="w-6 h-6">{v.icon}</NavIcon>{v.label}
-          </button>
-        ))}
+      <nav aria-label="Fan page" className="sm:hidden fixed inset-x-0 bottom-0 z-[1090] bg-white border-t border-gray-200 grid grid-cols-3 px-1 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
+        {NAV.map((v) => {
+          const cls = `grid justify-items-center gap-0.5 py-1.5 rounded-2xl text-[10px] font-extrabold leading-tight ${view === v.key ? 'bg-sun-soft text-ink' : 'text-gray-500'}`;
+          return v.href
+            ? <Link key={v.key} href={v.href} className={cls}><NavIcon className="w-6 h-6">{v.icon}</NavIcon>{v.label}</Link>
+            : <button key={v.key} type="button" onClick={() => go(v.key as View)} aria-current={view === v.key ? 'page' : undefined} className={cls}><NavIcon className="w-6 h-6">{v.icon}</NavIcon>{v.label}</button>;
+        })}
       </nav>
 
       {notice && (

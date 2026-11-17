@@ -111,22 +111,31 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       let data: unknown[] | null = null;
       const LISTS: MineList[] = [];
       let mineUser: string | null = null;
+      const SAVED_IDS = new Set<string>();   // videos the fan saved
+      const FOLLOWED = new Set<string>();    // creators the fan follows
       if (mine) {
         // Only this fan's saved videos, plus their lists.
         const sb = getSupabase();
         const { data: { session } } = await sb.auth.getSession();
         mineUser = session?.user.id ?? null;
         if (mineUser) {
-          const [sv, ls] = await Promise.all([
+          const [sv, ls, fo] = await Promise.all([
             sb.from('saved_videos').select('video_id').eq('user_id', mineUser),
             sb.from('lists').select('id, name, list_items(video_id)').eq('user_id', mineUser).order('created_at'),
+            sb.from('follows').select('creator_id').eq('user_id', mineUser),
           ]);
           ((ls.data ?? []) as unknown as { id: string; name: string; list_items: { video_id: string }[] }[])
             .forEach((r) => LISTS.push({ id: r.id, name: r.name, ids: new Set((r.list_items ?? []).map((i) => i.video_id)) }));
           const ids = (sv.data ?? []).map((r) => r.video_id as string);
-          if (ids.length) {
-            const res = await sb.from('videos').select(ROW_FIELDS).in('id', ids).eq('hidden', false).not('lat', 'is', null)
-              .order('posted_at', { ascending: false });
+          ids.forEach((i) => SAVED_IDS.add(i));
+          (fo.data ?? []).forEach((r) => FOLLOWED.add(r.creator_id as string));
+          // Everything from creators they follow, plus any videos they saved from anyone else.
+          const parts: string[] = [];
+          if (ids.length) parts.push(`id.in.(${ids.join(',')})`);
+          if (FOLLOWED.size) parts.push(`creator_id.in.(${[...FOLLOWED].join(',')})`);
+          if (parts.length) {
+            const res = await sb.from('videos').select(ROW_FIELDS).or(parts.join(',')).eq('hidden', false).not('lat', 'is', null)
+              .order('posted_at', { ascending: false }).limit(3000);
             data = res.data;
           }
         }
@@ -152,6 +161,11 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (disposed) return;
 
       const { places: ALL, creators: CREATORS } = groupPlaces((data ?? []) as unknown as Row[]);
+      const followHandles = new Set<string>();
+      let followCount = 0;
+      ((data ?? []) as unknown as Row[]).forEach((r) => {
+        if (FOLLOWED.has(r.creator_id)) { followHandles.add(r.creators?.tiktok_username ?? 'unknown'); followCount++; }
+      });
       const params = new URLSearchParams(window.location.search);
       const focusId = params.get('focus');
       const want = (params.get('creator') ?? initialCreator ?? '').replace(/^@/, '').toLowerCase();
@@ -181,43 +195,50 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const h = sel.value || null;
         const url = new URL(window.location.href);
         url.searchParams.delete('focus');
-        if (mine) { if (h) url.searchParams.set('list', h); else url.searchParams.delete('list'); }
+        if (mine) { if (h && h !== 'follow') url.searchParams.set('list', h); else url.searchParams.delete('list'); }
         else if (h) url.searchParams.set('creator', h); else url.searchParams.delete('creator');
         window.history.replaceState(null, '', url);
-        if (mine) openMine(h); else openPub(h);
+        if (mine) openMine(h || 'follow'); else openPub(h);
       };
 
       // ── My Map: the dropdown is the fan's lists, and a panel under the map edits the chosen one ──
-      const savedPlaces = (ids: Set<string> | null): Place[] => ids
-        ? ALL.map((p) => ({ ...p, videos: p.videos.filter((v) => ids.has(v.dbId)) })).filter((p) => p.videos.length)
-        : ALL;
+      // key: 'follow' (creators I follow), 'all' (everything I saved) or a list id.
+      const placesFor = (key: string): Place[] => {
+        const l = LISTS.find((x) => x.id === key);
+        const ids = l ? l.ids : key === 'all' ? SAVED_IDS : null;
+        if (ids) return ALL.map((p) => ({ ...p, videos: p.videos.filter((v) => ids.has(v.dbId)) })).filter((p) => p.videos.length);
+        return ALL.filter((p) => followHandles.has(p.creator));
+      };
+      const defaultKey = () => (FOLLOWED.size ? 'follow' : 'all');
+      const isList = (k: string | null) => !!k && LISTS.some((x) => x.id === k);
       const spotWord = (n: number) => `${n} spot${n === 1 ? '' : 's'}`;
       let lpMode: 'idle' | 'rename' | 'new' | 'delete' = 'idle';
       let lpBusy = false;
       const changed = () => window.dispatchEvent(new CustomEvent('povgo:lists-changed'));
       function fillListSelect() {
-        sel.innerHTML = `<option value="">All saved (${new Set(ALL.flatMap((p) => p.videos.map((v) => v.dbId))).size})</option>` +
+        const savedShown = new Set(ALL.flatMap((p) => p.videos.map((v) => v.dbId).filter((id) => SAVED_IDS.has(id)))).size;
+        sel.innerHTML = `<option value="follow">Following (${followCount})</option><option value="all">All saved (${savedShown})</option>` +
           LISTS.map((l) => `<option value="${esc(l.id)}">${esc(l.name)} · ${l.ids.size}</option>`).join('');
-        sel.value = CUR ?? '';
+        sel.value = CUR ?? 'follow';
       }
-      function openMine(id: string | null) {
-        const l = id ? LISTS.find((x) => x.id === id) : undefined;
-        CUR = l ? l.id : null;
+      function openMine(key: string) {
+        const l = LISTS.find((x) => x.id === key);
+        CUR = l ? l.id : key === 'all' ? 'all' : 'follow';
         combinedMode = true; ACCENT = SUN;
         $('pub').style.setProperty('--accent', ACCENT);
-        PUBSET = savedPlaces(l ? l.ids : null);
+        PUBSET = placesFor(CUR);
         lpMode = 'idle';
         fillListSelect();
         $('pubPfp').innerHTML = HOME_PIN;
-        $('pubName').textContent = l ? l.name : 'All saved';
+        $('pubName').textContent = l ? l.name : CUR === 'all' ? 'All saved' : 'Following';
         $('pubHandle').textContent = `${spotWord(PUBSET.length)} · tap a pin to watch`;
         showPub();
         renderListPanel();
       }
       function renderListPanel() {
         const el = document.getElementById('pubListEdit'); if (!el) return;
-        const l = CUR ? LISTS.find((x) => x.id === CUR) : undefined;
-        const title = l ? l.name : 'All saved';
+        const l = LISTS.find((x) => x.id === CUR);
+        const title = l ? l.name : CUR === 'all' ? 'All saved' : 'Following';
         let body = '';
         if (lpMode === 'rename' && l) {
           body = `<form class="lp-form" data-lp-form="rename"><input name="n" value="${esc(l.name)}" maxlength="60" aria-label="List name" autocomplete="off">
@@ -232,9 +253,10 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           body = `<div class="lp-btns">${l ? `<button class="lp-btn" type="button" data-lp="rename">Rename</button><button class="lp-btn" type="button" data-lp="delete">Delete list</button>` : ''}
             <button class="lp-btn sun" type="button" data-lp="new">+ New list</button></div>`;
         }
+        const what = CUR === 'all' ? 'Everything you saved.' : FOLLOWED.size ? 'Spots from the creators you follow.' : 'Follow a few creators and their spots will show up here.';
         const hint = !l && lpMode === 'idle'
-          ? `<p class="lp-hint">${LISTS.length ? 'Pick a list from the menu at the top to edit it.' : 'Make a list like “Date night”, then add videos to it from My Videos.'}</p>` : '';
-        const empty = l && !PUBSET.length ? `<p class="lp-hint">This list is empty. Open My Videos and tap “+ List” on a video to add it here.</p>` : '';
+          ? `<p class="lp-hint">${what} ${LISTS.length ? 'Pick a list from the menu at the top to edit it.' : 'Make a list like “Date night” with + New list.'}</p>` : '';
+        const empty = l && !PUBSET.length ? `<p class="lp-hint">This list is empty. Open Saved and tap “+ List” on a video to add it here.</p>` : '';
         el.innerHTML = `<div class="lp-head"><h3>${esc(title)}</h3><span class="lp-n">${spotWord(PUBSET.length)}</span></div>${body}${hint}${empty}`;
         el.querySelector('input')?.focus();
       }
@@ -244,15 +266,15 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const a = t.dataset.lp;
         if (a === 'rename' || a === 'new' || a === 'delete') { lpMode = a; renderListPanel(); return; }
         if (a === 'cancel') { lpMode = 'idle'; renderListPanel(); return; }
-        if (a === 'delete-yes' && CUR) {
+        if (a === 'delete-yes' && isList(CUR)) {
           lpBusy = true;
-          const id = CUR;
+          const id = CUR!;
           const { error } = await getSupabase().from('lists').delete().eq('id', id);
           lpBusy = false;
           if (error) return;
           LISTS.splice(LISTS.findIndex((x) => x.id === id), 1);
           const url = new URL(window.location.href); url.searchParams.delete('list'); window.history.replaceState(null, '', url);
-          openMine(null); changed();
+          openMine(defaultKey()); changed();
         }
       });
       document.getElementById('pubListEdit')?.addEventListener('submit', async (e) => {
@@ -262,12 +284,12 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         if (!name || lpBusy || !mineUser) return;
         lpBusy = true;
         const sb = getSupabase();
-        if (form.dataset.lpForm === 'rename' && CUR) {
+        if (form.dataset.lpForm === 'rename' && isList(CUR)) {
           const l = LISTS.find((x) => x.id === CUR)!;
-          const { error } = await sb.from('lists').update({ name }).eq('id', CUR);
+          const { error } = await sb.from('lists').update({ name }).eq('id', CUR!);
           lpBusy = false;
           if (error) return;
-          l.name = name; openMine(CUR); changed();
+          l.name = name; openMine(CUR!); changed();
         } else {
           const { data: row, error } = await sb.from('lists').insert({ user_id: mineUser, name }).select('id, name').single();
           lpBusy = false;
@@ -360,7 +382,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         });
         $('pubRight').innerHTML = PUBSET.length
           ? `<div class="empty"><div class="big">👈</div>Pick a place from the list — or a pin on the map — to watch its video right here.</div>`
-          : `<div class="empty"><div class="big">📍</div>${mine ? 'Nothing here yet. Save a video and it will show up on this map.' : 'No spots on the map yet.'}</div>`;
+          : `<div class="empty"><div class="big">📍</div>${mine ? 'Nothing here yet. Follow a creator or save a video and it will show up on this map.' : 'No spots on the map yet.'}</div>`;
         $('pubRight').classList.remove('show'); $('pubLeft').classList.remove('expanded');
         renderPubList();
         setTimeout(() => { pubmap!.invalidateSize(); applyPubFilter(true); }, 60);
@@ -560,7 +582,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           card.innerHTML = `<h4>${esc(p.name)}</h4>
             ${combinedMode ? `<div class="by"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a></div>` : ''}
             <div class="mt"><span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}</div>
-            ${mine && CUR ? '<button class="premove" type="button">Remove from list</button>' : ''}`;
+            ${mine && isList(CUR) ? '<button class="premove" type="button">Remove from list</button>' : ''}`;
           card.onclick = () => selectPub(i, undefined, true);
           const rm = card.querySelector('.premove') as HTMLElement | null;
           if (rm) rm.onclick = (ev) => { ev.stopPropagation(); removeFromList(p); };
@@ -604,7 +626,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (focusPlace && start && focusPlace.creator !== start && !embedded) start = null;
       if (mine) {
         const wantList = params.get('list');
-        openMine(wantList && LISTS.some((l) => l.id === wantList) ? wantList : null);
+        openMine(wantList && (wantList === 'all' || isList(wantList)) ? wantList : defaultKey());
       } else openPub(start);
       if (!mine && focusPlace && PUBSET.includes(focusPlace)) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
 

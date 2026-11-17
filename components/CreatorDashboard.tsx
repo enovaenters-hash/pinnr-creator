@@ -8,7 +8,7 @@ import { categoryColor, CONTENT_TYPES, creatorTypes, type Creator, type Video } 
 import { api } from '@/lib/api';
 import VideoEditForm from '@/components/VideoEditForm';
 import ConnectedAccounts from '@/components/ConnectedAccounts';
-import { NotConfigured, inputClass, primaryBtn } from '@/components/AuthCard';
+import { NotConfigured, Switch, inputClass, primaryBtn } from '@/components/AuthCard';
 import SiteNav from '@/components/SiteNav';
 import type { MapPin } from '@/components/Map';
 
@@ -18,7 +18,7 @@ type Filter = 'all' | 'needs' | 'mapped';
 
 /**
  * The creator dashboard. `embedded` drops the site bar and page frame so it can sit inside
- * the fan page's Creator tab. Someone signed in without a creator profile sees "Become a creator".
+ * the My Spots tab. Someone signed in without a creator profile sees "Share your own spots".
  */
 export default function CreatorDashboard({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
@@ -279,8 +279,9 @@ function Shell({ embedded, children }: { embedded: boolean; children: React.Reac
   );
 }
 
-/** Shown to a signed-in person with no creator profile: add a TikTok username to become one. */
+/** Shown to a signed-in person with no creator profile: flip the Creator mode switch and add a TikTok username. */
 function BecomeCreator({ onDone }: { onDone: () => void }) {
+  const [on, setOn] = useState(false);
   const [handle, setHandle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -308,21 +309,26 @@ function BecomeCreator({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="card p-6 max-w-md mx-auto my-8 text-center">
-      <h2 className="text-2xl font-semibold">Become a creator</h2>
-      <p className="text-sm text-gray-600 mt-2">Add your TikTok username and your own videos land on the map, with a Top 3 page you can share.</p>
-      <form onSubmit={submit} className="mt-5 space-y-3 text-left">
-        <label className="block">
-          <span className="text-xs font-medium text-gray-600">TikTok username</span>
-          <div className="relative mt-1">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">@</span>
-            <input id="become-creator-handle" className={`${inputClass} pl-8`} value={handle} onChange={(e) => setHandle(e.target.value)}
-              placeholder="yourhandle" autoCapitalize="none" autoCorrect="off" required />
-          </div>
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className={primaryBtn} disabled={busy}>{busy ? 'Setting up…' : 'Connect my TikTok'}</button>
-      </form>
+    <div className="card p-6 max-w-md mx-auto my-8">
+      <h2 className="text-2xl font-semibold text-center">My Spots</h2>
+      <p className="text-sm text-gray-600 mt-2 text-center">Your own TikTok spots on the map, with a Top 3 page you can share.</p>
+      <div className="mt-5">
+        <Switch id="creator-mode" on={on} onChange={setOn} label="Creator mode" hint="Flip on and add your TikTok username." />
+      </div>
+      {on && (
+        <form onSubmit={submit} className="mt-4 space-y-3 text-left">
+          <label className="block">
+            <span className="text-xs font-medium text-gray-600">TikTok username</span>
+            <div className="relative mt-1">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">@</span>
+              <input id="become-creator-handle" className={`${inputClass} pl-8`} value={handle} onChange={(e) => setHandle(e.target.value)}
+                placeholder="yourhandle" autoCapitalize="none" autoCorrect="off" required autoFocus />
+            </div>
+          </label>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button className={primaryBtn} disabled={busy}>{busy ? 'Turning on…' : 'Turn on creator mode'}</button>
+        </form>
+      )}
     </div>
   );
 }
