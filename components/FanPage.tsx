@@ -16,13 +16,12 @@ import type { MapPin } from '@/components/Map';
 
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
-type View = 'feed' | 'videos' | 'lists' | 'map' | 'creator';
+type View = 'feed' | 'videos' | 'map' | 'creator';
 type Sort = 'new' | 'near' | 'creator' | 'az';
 
 const VIEWS: { key: View; label: string; icon: React.ReactNode }[] = [
   { key: 'feed', label: 'Feed', icon: <><rect x="4" y="4" width="16" height="6" rx="2" /><rect x="4" y="13" width="16" height="7" rx="2" /></> },
   { key: 'videos', label: 'My Videos', icon: <><rect x="3.5" y="4.5" width="17" height="15" rx="4" /><path d="M10 8.8L15.5 12L10 15.2Z" fill="#fff" /></> },
-  { key: 'lists', label: 'My Lists', icon: <><rect x="4" y="5" width="4" height="4" rx="1.2" /><rect x="4" y="13" width="4" height="4" rx="1.2" /><path d="M11 7H20M11 15H20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" fill="none" /></> },
   { key: 'map', label: 'My Map', icon: <><path d="M12 21.5C12 21.5 4.5 14.5 4.5 9.5A7.5 7.5 0 0 1 19.5 9.5C19.5 14.5 12 21.5 12 21.5Z" /><circle cx="12" cy="9.5" r="2.6" fill="#fff" /></> },
   { key: 'creator', label: 'Creator', icon: <><circle cx="12" cy="8" r="4" /><path d="M4 20.5C4 16 7.6 13.5 12 13.5C16.4 13.5 20 16 20 20.5Z" /></> },
 ];
@@ -33,8 +32,8 @@ const SORTS: { key: Sort; label: string }[] = [
 const isView = (v: string | null): v is View => VIEWS.some((x) => x.key === v);
 
 /**
- * The signed-in fan's page: Feed (creators you follow), My Videos (saved, sortable), My Lists,
- * My Map (saved locations) and Creator (your own videos, via the creator dashboard).
+ * The signed-in fan's page: Feed (creators you follow), My Videos (saved, sortable), My Map (saved
+ * locations, with the fan's lists under the map) and Creator (your own videos, via the creator dashboard).
  */
 export default function FanPage() {
   const [uid, setUid] = useState<string | null | undefined>(undefined); // undefined = checking
@@ -47,7 +46,6 @@ export default function FanPage() {
   const [lists, setLists] = useState<FanList[]>([]);
   const [sort, setSort] = useState<Sort>('new');
   const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
-  const [openList, setOpenList] = useState<string | null>(null);
   const [mapFilter, setMapFilter] = useState<string>('all');
   const [finding, setFinding] = useState(false);
   const [notice, setNotice] = useState('');
@@ -93,6 +91,7 @@ export default function FanPage() {
     if (!supabaseConfigured) return;
     const wanted = new URLSearchParams(window.location.search).get('view');
     if (isView(wanted)) setView(wanted);
+    else if (wanted === 'lists') setView('map'); // lists now live under the map
     const supabase = getSupabase();
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -173,13 +172,12 @@ export default function FanPage() {
     const { data, error } = await getSupabase().from('lists').insert({ user_id: uid, name: clean }).select('id, name').single();
     if (error || !data) { flash('Couldn’t create that list. Try again.'); return null; }
     setLists((ls) => [...ls, { id: data.id, name: data.name, videoIds: [] }]);
-    setOpenList(data.id);
+    setMapFilter(data.id);
     return data.id;
   }
 
   async function deleteList(id: string) {
     setLists((ls) => ls.filter((l) => l.id !== id));
-    if (openList === id) setOpenList(null);
     if (mapFilter === id) setMapFilter('all');
     const { error } = await getSupabase().from('lists').delete().eq('id', id);
     if (error) flash('Couldn’t delete that list. Refresh and try again.');
@@ -256,7 +254,6 @@ export default function FanPage() {
     if (sort === 'az') return '';
     return `Saved ${timeAgo(s.savedAt).toLowerCase()}`;
   };
-  const current = lists.find((l) => l.id === openList) ?? lists[0] ?? null;
   const inList = (l: FanList) => saved.filter((s) => l.videoIds.includes(s.video.id));
   const mapList = lists.find((l) => l.id === mapFilter);
   const onMap = (mapList ? inList(mapList) : saved).filter((s) => s.video.lat !== null && s.video.lng !== null);
@@ -398,69 +395,48 @@ export default function FanPage() {
             </section>
           )}
 
-          {view === 'lists' && (
-            <section>
-              <h2 className="text-xl font-semibold mb-3 flex items-baseline gap-2">My lists
-                <span className="text-xs font-bold text-gray-500 font-sans">tap a list to open it</span></h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                {lists.map((l) => {
-                  const items = inList(l);
-                  return (
-                    <button key={l.id} type="button" onClick={() => setOpenList(l.id)} aria-pressed={current?.id === l.id}
-                      className={`card p-2 text-left grid grid-cols-[minmax(0,1fr)] gap-1.5 content-start min-w-0 ${current?.id === l.id ? 'ring-4 ring-sun' : ''}`}>
-                      <span className="grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden bg-frost aspect-square">
-                        {[0, 1, 2, 3].map((i) => (
-                          <span key={i} className="relative bg-frost">
-                            {items[i]?.video.cover_url && <img src={items[i].video.cover_url!} referrerPolicy="no-referrer" alt=""
-                              onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} className="absolute inset-0 w-full h-full object-cover" />}
-                          </span>
-                        ))}
-                      </span>
-                      <span className="font-display font-semibold truncate px-1">{l.name}</span>
-                      <span className="text-xs font-bold text-gray-500 px-1 pb-1">{items.length} spot{items.length === 1 ? '' : 's'}</span>
-                    </button>
-                  );
-                })}
-                <NewListCard onCreate={createList} />
-              </div>
-
-              {current ? (
-                <ListDetail key={current.id} list={current} items={inList(current)}
-                  onRemove={(id) => toggleListItem(current.id, id)} onDelete={() => deleteList(current.id)}
-                  onMap={() => { setMapFilter(current.id); go('map'); }} />
-              ) : (
-                <Empty>Make a list like “Date night”, then add videos to it from My Videos.</Empty>
-              )}
-            </section>
-          )}
-
           {view === 'map' && (
             <section>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
-                <h2 className="text-xl font-semibold flex items-baseline gap-2">My map
-                  <span className="text-xs font-bold text-gray-500 font-sans">{onMap.length} saved location{onMap.length === 1 ? '' : 's'}</span></h2>
-                <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto" role="group" aria-label="Show on map">
-                  <span className="text-xs font-extrabold text-gray-500 mr-1">Show</span>
-                  {[{ id: 'all', name: 'All saved' }, ...lists].map((l) => (
-                    <button key={l.id} type="button" onClick={() => setMapFilter(l.id)} aria-pressed={mapFilter === l.id}
-                      className={`px-3 py-1.5 text-xs font-extrabold rounded-full ${mapFilter === l.id ? 'bg-ink text-white' : 'bg-white text-ink border border-gray-200'}`}>
-                      {l.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <h2 className="text-xl font-semibold mb-3 flex items-baseline gap-2">My map
+                <span className="text-xs font-bold text-gray-500 font-sans">
+                  {mapList ? `${mapList.name} · ` : ''}{onMap.length} saved location{onMap.length === 1 ? '' : 's'}</span></h2>
               {onMap.length === 0 ? (
                 <Empty>{saved.length ? 'None of these saved videos has a location on the map yet.' : 'Save a few videos and their locations will show up here.'}</Empty>
               ) : (
-                <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[18rem_minmax(0,1fr)] items-start">
-                  <div className="h-[55vh] sm:h-[32rem] rounded-xl overflow-hidden border-2 border-white shadow-[0_6px_20px_rgba(19,41,58,.07)] relative z-0 sm:order-2">
-                    <Map pins={pins} />
-                  </div>
-                  <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:order-1">
-                    {onMap.map(({ video: v }) => (
-                      <li key={v.id}><Row video={v} right={<Link href={videoHref(v)} className="btn-sun px-3 py-1.5 text-xs shrink-0">Open</Link>} /></li>
-                    ))}
-                  </ul>
+                <div className="h-[55vh] sm:h-[28rem] rounded-xl overflow-hidden border-2 border-white shadow-[0_6px_20px_rgba(19,41,58,.07)] relative z-0">
+                  <Map pins={pins} />
+                </div>
+              )}
+
+              <h2 className="text-xl font-semibold mt-8 mb-3 flex items-baseline gap-2">My lists
+                <span className="text-xs font-bold text-gray-500 font-sans">tap a list to show it on the map</span></h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                <ListTile name="All saved" items={saved} selected={!mapList} onClick={() => setMapFilter('all')} />
+                {lists.map((l) => (
+                  <ListTile key={l.id} name={l.name} items={inList(l)} selected={mapFilter === l.id} onClick={() => setMapFilter(l.id)} />
+                ))}
+                <NewListCard onCreate={createList} />
+              </div>
+
+              {mapList ? (
+                <ListDetail key={mapList.id} list={mapList} items={inList(mapList)}
+                  onRemove={(id) => toggleListItem(mapList.id, id)} onDelete={() => deleteList(mapList.id)} />
+              ) : (
+                <div>
+                  <h3 className="text-xl font-semibold mb-3 flex items-baseline gap-2">All saved
+                    <span className="text-xs font-bold text-gray-500 font-sans">{saved.length} spot{saved.length === 1 ? '' : 's'}</span></h3>
+                  {saved.length === 0 ? (
+                    <Empty>Nothing saved yet. Tap the heart on any video, then group your favorites into a list like “Date night”.</Empty>
+                  ) : (
+                    <>
+                      {lists.length === 0 && <p className="text-sm text-gray-600 mb-3">Make a list above, then add videos to it from <button type="button" className="font-extrabold text-glacier underline" onClick={() => go('videos')}>My Videos</button>.</p>}
+                      <ul className="grid grid-cols-[minmax(0,1fr)] gap-2">
+                        {saved.map(({ video: v }) => (
+                          <li key={v.id}><Row video={v} right={<Link href={videoHref(v)} className="btn-sun px-3 py-1.5 text-xs shrink-0">Open</Link>} /></li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </div>
               )}
             </section>
@@ -471,7 +447,7 @@ export default function FanPage() {
       </main>
 
       {/* Navigation along the bottom on a phone */}
-      <nav aria-label="Fan page" className="sm:hidden fixed inset-x-0 bottom-0 z-[1090] bg-white border-t border-gray-200 grid grid-cols-5 px-1 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
+      <nav aria-label="Fan page" className="sm:hidden fixed inset-x-0 bottom-0 z-[1090] bg-white border-t border-gray-200 grid grid-cols-4 px-1 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
         {VIEWS.map((v) => (
           <button key={v.key} type="button" onClick={() => go(v.key)} aria-current={view === v.key ? 'page' : undefined}
             className={`grid justify-items-center gap-0.5 py-1.5 rounded-2xl text-[10px] font-extrabold leading-tight ${view === v.key ? 'bg-sun-soft text-ink' : 'text-gray-500'}`}>
@@ -618,6 +594,25 @@ function SavedCard({ item, tag, lists, onUnsave, onToggleList, onNewList }: {
   );
 }
 
+/** One tile in the lists grid: a 2x2 collage of covers, the name and the spot count. */
+function ListTile({ name, items, selected, onClick }: { name: string; items: SavedVideo[]; selected: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={selected}
+      className={`card p-2 text-left grid grid-cols-[minmax(0,1fr)] gap-1.5 content-start min-w-0 ${selected ? 'ring-4 ring-sun' : ''}`}>
+      <span className="grid grid-cols-2 gap-0.5 rounded-xl overflow-hidden bg-frost aspect-square">
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className="relative bg-frost">
+            {items[i]?.video.cover_url && <img src={items[i].video.cover_url!} referrerPolicy="no-referrer" alt=""
+              onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} className="absolute inset-0 w-full h-full object-cover" />}
+          </span>
+        ))}
+      </span>
+      <span className="font-display font-semibold truncate px-1">{name}</span>
+      <span className="text-xs font-bold text-gray-500 px-1 pb-1">{items.length} spot{items.length === 1 ? '' : 's'}</span>
+    </button>
+  );
+}
+
 function NewListCard({ onCreate }: { onCreate: (name: string) => Promise<string | null> }) {
   const [name, setName] = useState('');
   return (
@@ -631,8 +626,8 @@ function NewListCard({ onCreate }: { onCreate: (name: string) => Promise<string 
   );
 }
 
-function ListDetail({ list, items, onRemove, onDelete, onMap }: {
-  list: FanList; items: SavedVideo[]; onRemove: (videoId: string) => void; onDelete: () => void; onMap: () => void;
+function ListDetail({ list, items, onRemove, onDelete }: {
+  list: FanList; items: SavedVideo[]; onRemove: (videoId: string) => void; onDelete: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   return (
@@ -649,7 +644,6 @@ function ListDetail({ list, items, onRemove, onDelete, onMap }: {
         ) : (
           <>
             <button type="button" onClick={() => setConfirming(true)} className="btn-ghost px-3 py-1.5 text-xs">Delete list</button>
-            <button type="button" onClick={onMap} className="btn-sun px-4 py-1.5 text-xs" disabled={items.length === 0}>Map this list</button>
           </>
         )}
       </div>
