@@ -10,7 +10,7 @@ import PosterTile from '@/components/PosterTile';
 import ExploreVideos from '@/components/ExploreVideos';
 import SiteNav from '@/components/SiteNav';
 
-// The home map is the same map as /map (pins open the video), starting on Phoenix.
+// The home map is the same map the old /map page had (pins open the video), starting on Phoenix.
 const FanMap = dynamic(() => import('@/components/FanMap'), { ssr: false });
 const PHOENIX = { center: [33.4484, -112.074] as [number, number], zoom: 10 };
 
@@ -103,7 +103,7 @@ export default function Home() {
             <div className="lg:col-start-2 lg:row-start-2">
               <div className="flex items-baseline justify-between mb-2">
                 <p className="text-[11px] font-extrabold uppercase tracking-widest text-gray-500">New POVs</p>
-                <Link href="/map" className="text-xs font-bold text-glacier hover:underline">See all →</Link>
+                <Link href="/#explore" className="text-xs font-bold text-glacier hover:underline">See all →</Link>
               </div>
               {newPovs === null && <div className="h-16 rounded-2xl bg-white animate-pulse" />}
               {newPovs?.length === 0 && <p className="text-sm text-gray-500">No videos synced yet.</p>}
@@ -118,7 +118,7 @@ export default function Home() {
         <section id="explore" className="mt-10 scroll-mt-4">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-2xl font-semibold">POVGo Featured</h2>
-            <Link href="/map" className="text-sm font-bold text-glacier hover:underline">See on map →</Link>
+            <Link href="/" className="text-sm font-bold text-glacier hover:underline">See on map →</Link>
           </div>
           {featured === null && (
             <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -176,7 +176,7 @@ function Stat({ label, value }: { label: string; value: number | null }) {
 
 function PovMini({ video }: { video: PublicVideo }) {
   return (
-    <Link href={`/map?focus=${video.id}`}
+    <Link href={`/?focus=${video.id}`}
       className="card flex w-[220px] shrink-0 items-center gap-3 p-2.5 border-2 border-transparent hover:border-ice transition-colors lg:w-auto">
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-ice to-frost">
         {video.cover_url && (
