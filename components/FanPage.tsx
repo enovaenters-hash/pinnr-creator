@@ -412,8 +412,8 @@ export default function FanPage() {
           )}
 
           {view === 'following' && (
-            <section id="following-map" aria-label="Following map" className="mt-10 scroll-mt-4">
-              <h2 className="text-xl font-semibold mb-3">Map</h2>
+            <section id="following-map" aria-label="Group Maps" className="mt-10 scroll-mt-4">
+              <h2 className="text-xl font-semibold mb-3">Group Maps</h2>
               <FanMap mine />
             </section>
           )}

@@ -206,7 +206,7 @@ export const FAN_CSS = `
   #pub.page .lp-hint{margin:10px 0 0;font-size:13px;font-weight:700;color:var(--muted)}
   #pub.page .premove{margin-top:8px;font-family:inherit;font-size:12px;font-weight:800;color:var(--ink);background:#fff;border:0;border-radius:999px;padding:5px 12px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
   /* My Map groups: photo buttons under the map (All, Following, Saved, each list), and a section per group when All is picked. */
-  #pub.page .gpick{display:flex;gap:10px;margin-top:14px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  #pub.page .gpick{display:flex;gap:10px;margin:0 0 10px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
   #pub.page .gtile{flex:0 0 auto;width:100px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:stretch;text-align:left;font-family:inherit;color:var(--ink);background:#fff;border:0;border-radius:18px;padding:0 0 9px;cursor:pointer;overflow:hidden;box-shadow:inset 0 0 0 2px var(--line),0 4px 14px rgba(19,41,58,.06);border-top:5px solid var(--gc,var(--line))}
   #pub.page .gtile:hover{box-shadow:inset 0 0 0 2px var(--gc,var(--line)),0 4px 14px rgba(19,41,58,.1)}
   #pub.page .gtile.on{box-shadow:inset 0 0 0 3px var(--gc,var(--ink)),0 6px 18px rgba(19,41,58,.14);background:#fffbe8}
