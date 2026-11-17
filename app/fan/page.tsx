@@ -2,7 +2,7 @@
 
 import FanPage from '@/components/FanPage';
 
-/** The fan's own page: Feed, My Videos, My Lists, My Map and Creator. */
+/** The signed-in page: Following (Latest, Map, Saved) and My Spots, with Explore linking home. */
 export default function FanRoute() {
   return <FanPage />;
 }
