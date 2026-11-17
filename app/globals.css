@@ -8,7 +8,7 @@
   --font-display: var(--font-fredoka), var(--font-nunito), system-ui, sans-serif;
   --font-logo: var(--font-sora), system-ui, sans-serif;
 
-  --color-ice: #7fd4f2;
+  --color-ice: #2fa9e0;
   --color-glacier: #1c7fb0;
   --color-frost: #dff4fc;
   --color-ink: #13293a;
@@ -30,7 +30,7 @@
 
   --color-blue-50: #eef9fd;
   --color-blue-100: #dff4fc;
-  --color-blue-500: #7fd4f2;
+  --color-blue-500: #2fa9e0;
   --color-blue-600: #1c7fb0;
   --color-blue-700: #156a94;
 
