@@ -2,7 +2,7 @@
 export const PIN_PATH = 'M24 47C24 47 5 29 5 18A19 19 0 0 1 43 18C43 29 24 47 24 47Z';
 export const PLAY_PATH = 'M19.5 10.5L31.5 18L19.5 25.5Z';
 
-export const ICE = '#7fd4f2';
+export const ICE = '#2fa9e0';
 export const SUN = '#ffd23f';
 export const INK = '#13293a';
 
