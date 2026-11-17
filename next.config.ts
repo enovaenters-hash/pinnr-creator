@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: "/map/combined", destination: "/map", permanent: false },
+      { source: "/map/combined", destination: "/", permanent: false },
       { source: "/map/personal", destination: "/dashboard", permanent: false },
     ];
   },
