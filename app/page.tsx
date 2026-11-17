@@ -9,6 +9,7 @@ import type { PublicVideo } from '@/components/PublicMap';
 import PosterTile from '@/components/PosterTile';
 import ExploreVideos from '@/components/ExploreVideos';
 import SiteNav from '@/components/SiteNav';
+import BottomNav from '@/components/BottomNav';
 
 // The home map is the same map the old /map page had (pins open the video), starting on Phoenix.
 const FanMap = dynamic(() => import('@/components/FanMap'), { ssr: false });
@@ -79,7 +80,7 @@ export default function Home() {
     <>
     <SiteNav active="home" />
     <main className="flex-1 bg-cloud text-ink">
-      <div className="max-w-5xl mx-auto px-4 pb-16">
+      <div className="max-w-5xl mx-auto px-4 pb-28">
         {/* Hero: tagline, then stats + Phoenix map + newest pins */}
         <header className="pt-8 sm:pt-12 pb-2">
           <h1 className="font-display font-bold tracking-tight leading-[1.05] whitespace-nowrap text-[clamp(1.4rem,6.4vw,3.75rem)]">
@@ -161,6 +162,7 @@ export default function Home() {
         </footer>
       </div>
     </main>
+    <BottomNav active="explore" />
     </>
   );
 }
