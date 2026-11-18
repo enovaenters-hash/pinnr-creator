@@ -74,7 +74,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
       setTop(list);
 
       const { data: all } = await supabase.from('videos')
-        .select('*, creators(tiktok_username, display_name, content_type, content_types)')
+        .select('*, creators(tiktok_username, display_name)')
         .eq('creator_id', c.id).eq('hidden', false).not('lat', 'is', null)
         .order('posted_at', { ascending: false, nullsFirst: false });
       setVids((all as PublicVideo[]) ?? []);
