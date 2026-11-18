@@ -147,7 +147,7 @@ export const FAN_CSS = `
   }
 
   /* ───── Creator page "Showing" menu: narrow the map and list to one of the creator's public groups ───── */
-  .gsel{flex:0 1 auto;max-width:48%;min-width:0;font:inherit;font-size:13px;font-weight:800;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:999px;padding:8px 10px;cursor:pointer;text-overflow:ellipsis}
+  .gsel{flex:0 1 auto;max-width:50%;min-width:0;font:inherit;font-size:13px;font-weight:800;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:999px;padding:8px 10px;cursor:pointer;text-overflow:ellipsis}
   .gsel[hidden]{display:none}
   .gsel.on{background:var(--ink);color:#fff}
 

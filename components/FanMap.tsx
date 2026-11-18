@@ -774,8 +774,8 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           .filter((g) => g.ids.length > 0);
         const s = document.getElementById('pubGroupSel') as HTMLSelectElement | null;
         if (!s) return;
-        s.innerHTML = `<option value="">Showing: All spots</option>`
-          + GROUPS.map((g) => `<option value="${esc(g.id)}">Showing: ${esc(g.name)} (${g.ids.length})</option>`).join('');
+        s.innerHTML = `<option value="">All spots</option>`
+          + GROUPS.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} · ${g.ids.length}</option>`).join('');
         s.hidden = GROUPS.length === 0;
         s.onchange = () => setGroup(s.value);
       }
@@ -920,7 +920,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
             <div className="sheethandle" id="sheetHandle" />
             <div className="srch">
               <input id="pubSearch" placeholder="Search places…" autoComplete="off" />
-              <select id="pubGroupSel" className="gsel" aria-label="Show a group" hidden />
+              <select id="pubGroupSel" className="gsel" aria-label="Showing" hidden />
               <button className="srch-toggle" id="srchToggle">▼</button>
             </div>
             <div id="pubCount" />
