@@ -16,6 +16,9 @@ const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
 type Filter = 'all' | 'needs' | 'mapped';
 
+/** A creator's own group of videos, shown on their public page. */
+type Group = { id: string; name: string; videoIds: string[] };
+
 /**
  * The creator dashboard. `embedded` drops the site bar and page frame so it can sit inside
  * the My Spots tab. Someone signed in without a creator profile sees "Share your own spots".
@@ -29,18 +32,27 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
   const [status, setStatus] = useState<{ text: string; tone: 'info' | 'ok' | 'err' } | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
+  /** False when the creator_groups table isn't set up yet (supabase/creator-groups.sql not run). */
+  const [groupsReady, setGroupsReady] = useState(true);
+  const [groupsFor, setGroupsFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = getSupabase();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { if (embedded) setLoading(false); else router.replace('/login'); return; }
-    const [{ data: c }, { data: v }] = await Promise.all([
+    const [{ data: c }, { data: v }, g] = await Promise.all([
       supabase.from('creators').select('*').eq('id', session.user.id).maybeSingle(),
       supabase.from('videos').select('*').eq('creator_id', session.user.id)
         .order('posted_at', { ascending: false, nullsFirst: false }),
+      supabase.from('creator_groups').select('id, name, creator_group_items(video_id)')
+        .eq('creator_id', session.user.id).order('position').order('created_at'),
     ]);
     setCreator(c as Creator | null);
     setVideos((v as Video[]) ?? []);
+    setGroupsReady(!g.error);
+    setGroups(((g.data ?? []) as unknown as { id: string; name: string; creator_group_items: { video_id: string }[] }[])
+      .map((r) => ({ id: r.id, name: r.name, videoIds: (r.creator_group_items ?? []).map((i) => i.video_id) })));
     setLoading(false);
   }, [router, embedded]);
 
@@ -96,6 +108,46 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
       .update({ content_types: ordered, content_type: ordered[0] }).eq('id', creator.id);
     if (error) { setCreator(before); setStatus({ text: 'Couldn’t save your content types. Try again.', tone: 'err' }); }
     else setStatus({ text: 'Content types saved', tone: 'ok' });
+  }
+
+  async function createGroup(name: string): Promise<string | null> {
+    const clean = name.trim().slice(0, 40);
+    if (!clean || !creator) return null;
+    const { data, error } = await getSupabase().from('creator_groups')
+      .insert({ creator_id: creator.id, name: clean, position: groups.length }).select('id, name').single();
+    if (error || !data) { setStatus({ text: 'Couldn’t create that group. Try again.', tone: 'err' }); return null; }
+    setGroups((gs) => [...gs, { id: data.id, name: data.name, videoIds: [] }]);
+    setStatus({ text: `Group “${data.name}” created`, tone: 'ok' });
+    return data.id;
+  }
+
+  async function renameGroup(id: string, name: string) {
+    const clean = name.trim().slice(0, 40);
+    if (!clean) return;
+    const before = groups;
+    setGroups((gs) => gs.map((g) => (g.id === id ? { ...g, name: clean } : g)));
+    const { error } = await getSupabase().from('creator_groups').update({ name: clean }).eq('id', id);
+    if (error) { setGroups(before); setStatus({ text: 'Couldn’t rename that group. Try again.', tone: 'err' }); }
+  }
+
+  async function deleteGroup(id: string) {
+    const before = groups;
+    setGroups((gs) => gs.filter((g) => g.id !== id));
+    const { error } = await getSupabase().from('creator_groups').delete().eq('id', id);
+    if (error) { setGroups(before); setStatus({ text: 'Couldn’t delete that group. Try again.', tone: 'err' }); }
+    else setStatus({ text: 'Group deleted', tone: 'ok' });
+  }
+
+  async function toggleInGroup(groupId: string, videoId: string) {
+    // A group made a moment ago may not be in this render's `groups` yet, so "not found" means "not in it".
+    const has = groups.find((g) => g.id === groupId)?.videoIds.includes(videoId) ?? false;
+    setGroups((gs) => gs.map((g) => g.id !== groupId ? g
+      : { ...g, videoIds: has ? g.videoIds.filter((x) => x !== videoId) : [...g.videoIds, videoId] }));
+    const supabase = getSupabase();
+    const { error } = has
+      ? await supabase.from('creator_group_items').delete().eq('group_id', groupId).eq('video_id', videoId)
+      : await supabase.from('creator_group_items').insert({ group_id: groupId, video_id: videoId });
+    if (error) setStatus({ text: 'Couldn’t update that group. Refresh and try again.', tone: 'err' });
   }
 
   async function signOut() {
@@ -199,6 +251,10 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
           </p>
         </section>
 
+        {/* Groups */}
+        <GroupsPanel ready={groupsReady} groups={groups} onCreate={createGroup}
+          onRename={renameGroup} onDelete={deleteGroup} />
+
         {/* Videos */}
         <section>
           <div className="flex items-center justify-between mb-3">
@@ -247,12 +303,25 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
                       {v.discount_code && <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Code: {v.discount_code}</span>}
                       {v.hidden && <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Hidden</span>}
                       {v.posted_at && <span className="text-gray-400">{new Date(v.posted_at).toLocaleDateString()}</span>}
-                      <button onClick={() => setEditingId(editingId === v.id ? null : v.id)} className="ml-auto text-blue-600 font-medium">
+                      {groupsReady && (() => {
+                        const n = groups.filter((g) => g.videoIds.includes(v.id)).length;
+                        return (
+                          <button onClick={() => setGroupsFor(groupsFor === v.id ? null : v.id)} aria-expanded={groupsFor === v.id}
+                            className="ml-auto text-blue-600 font-medium">
+                            {groupsFor === v.id ? 'Done' : n ? `In ${n} group${n === 1 ? '' : 's'}` : '+ Group'}
+                          </button>
+                        );
+                      })()}
+                      <button onClick={() => setEditingId(editingId === v.id ? null : v.id)}
+                        className={`${groupsReady ? '' : 'ml-auto '}text-blue-600 font-medium`}>
                         {editingId === v.id ? 'Close' : 'Edit'}
                       </button>
                     </div>
                   </div>
                 </div>
+                {groupsFor === v.id && (
+                  <GroupPicker videoId={v.id} groups={groups} onToggle={toggleInGroup} onCreate={createGroup} />
+                )}
                 {editingId === v.id && (
                   <VideoEditForm video={v} onCancel={() => setEditingId(null)}
                     onSave={async (body) => { if (await patch(v.id, body)) setEditingId(null); }} />
@@ -338,6 +407,115 @@ function Stat({ label, value }: { label: string; value: string | number }) {
     <div className="card p-4">
       <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{label}</div>
       <div className="font-display text-3xl font-semibold mt-1">{value}</div>
+    </div>
+  );
+}
+
+/** The creator's groups: make, rename and delete them. Spots are added from each video's "+ Group" button. */
+function GroupsPanel({ ready, groups, onCreate, onRename, onDelete }: {
+  ready: boolean; groups: Group[];
+  onCreate: (name: string) => Promise<string | null>;
+  onRename: (id: string, name: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [newName, setNewName] = useState('');
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameTo, setRenameTo] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  return (
+    <section className="card p-5 mb-8" aria-labelledby="groups-heading">
+      <h2 id="groups-heading" className="text-xl font-semibold">Your groups</h2>
+      <p className="text-sm text-gray-600 mt-1">
+        Bundle your spots into groups like <em>Date night</em> or <em>Best tacos</em>. Fans see them on your public page.
+      </p>
+      {!ready ? (
+        <p className="mt-3 text-sm text-amber-700">Groups aren&apos;t switched on yet. Run <code>supabase/creator-groups.sql</code> in Supabase, then refresh.</p>
+      ) : (
+        <>
+          {groups.length > 0 && (
+            <ul className="mt-4 space-y-2">
+              {groups.map((g) => (
+                <li key={g.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                  {renaming === g.id ? (
+                    <form className="flex flex-1 gap-2 min-w-0" onSubmit={async (e) => {
+                      e.preventDefault(); await onRename(g.id, renameTo); setRenaming(null);
+                    }}>
+                      <input value={renameTo} onChange={(e) => setRenameTo(e.target.value)} maxLength={40} autoFocus
+                        aria-label={`New name for ${g.name}`} className="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                      <button className="btn-sun px-3 py-1 text-xs">Save</button>
+                      <button type="button" onClick={() => setRenaming(null)} className="text-xs text-gray-500">Cancel</button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-sm truncate">{g.name}</span>
+                      <span className="text-xs text-gray-500">{g.videoIds.length} spot{g.videoIds.length === 1 ? '' : 's'}</span>
+                      <span className="ml-auto flex items-center gap-3 text-xs">
+                        {confirmDelete === g.id ? (
+                          <>
+                            <span className="text-gray-600">Delete this group?</span>
+                            <button onClick={async () => { await onDelete(g.id); setConfirmDelete(null); }} className="text-red-600 font-bold">Delete</button>
+                            <button onClick={() => setConfirmDelete(null)} className="text-gray-500">Keep</button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => { setRenaming(g.id); setRenameTo(g.name); }} className="text-blue-600 font-medium">Rename</button>
+                            <button onClick={() => setConfirmDelete(g.id)} className="text-gray-500 hover:text-red-600">Delete</button>
+                          </>
+                        )}
+                      </span>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <form className="mt-3 flex gap-2" onSubmit={async (e) => {
+            e.preventDefault();
+            if (await onCreate(newName)) setNewName('');
+          }}>
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={40} placeholder="New group name"
+              aria-label="New group name" className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-full text-sm" />
+            <button className="btn-sun px-4 py-2 text-sm" disabled={!newName.trim()}>+ Add group</button>
+          </form>
+          {groups.length > 0 && (
+            <p className="text-xs text-gray-500 mt-2">Add spots with the <strong>+ Group</strong> button on any video below.</p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Under a video: tap a group to add or remove this video, or make a new group with it. */
+function GroupPicker({ videoId, groups, onToggle, onCreate }: {
+  videoId: string; groups: Group[];
+  onToggle: (groupId: string, videoId: string) => Promise<void>;
+  onCreate: (name: string) => Promise<string | null>;
+}) {
+  const [newName, setNewName] = useState('');
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Groups for this video">
+        {groups.map((g) => {
+          const inIt = g.videoIds.includes(videoId);
+          return (
+            <button key={g.id} type="button" onClick={() => onToggle(g.id, videoId)} aria-pressed={inIt}
+              className={`px-3 py-1.5 text-xs font-extrabold rounded-full ${inIt ? 'bg-ink text-white' : 'bg-white text-ink border border-gray-200'}`}>
+              {inIt ? '✓ ' : ''}{g.name}
+            </button>
+          );
+        })}
+      </div>
+      <form className="mt-2 flex gap-2" onSubmit={async (e) => {
+        e.preventDefault();
+        const id = await onCreate(newName);
+        if (id) { await onToggle(id, videoId); setNewName(''); }
+      }}>
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={40} placeholder="New group with this spot"
+          aria-label="New group name" className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded-md text-sm" />
+        <button className="btn-ghost px-3 py-1.5 text-xs" disabled={!newName.trim()}>Create</button>
+      </form>
     </div>
   );
 }
