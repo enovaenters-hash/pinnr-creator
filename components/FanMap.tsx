@@ -507,9 +507,8 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
             <div class="rbtns">
               <a class="rbtn go" target="_blank" rel="noopener" href="https://www.google.com/maps/search/${encodeURIComponent(p.addr)}">Directions ›</a>
               <a class="rbtn tt" target="_blank" rel="noopener" href="https://www.tiktok.com/@${encodeURIComponent(p.creator)}/video/${encodeURIComponent(v.id)}">▶ TikTok</a>
-              <button class="rbtn sv${savedSet.has(v.dbId) ? ' on' : ''}" data-act="save" data-id="${esc(v.dbId)}" aria-pressed="${savedSet.has(v.dbId)}">${savedSet.has(v.dbId) ? '♥ Saved' : '♡ Save'}</button>
+              <span class="svwrap"><button class="rbtn sv${savedSet.has(v.dbId) ? ' on' : ''}" data-act="save" data-id="${esc(v.dbId)}" aria-pressed="${savedSet.has(v.dbId)}">${savedSet.has(v.dbId) ? '♥ Saved' : '♡ Save'}</button><button class="rbtn dd" type="button" data-act="lists" data-id="${esc(v.dbId)}" aria-expanded="false" aria-haspopup="true" aria-label="Save to a group" title="Save to a group"><span class="ddc">▾</span></button></span>
             </div>
-            <div class="rbtns2"><button class="rbtn ls" type="button" data-act="lists" data-id="${esc(v.dbId)}" aria-expanded="false">＋ Add to a group</button></div>
             <div class="rlists" hidden></div>
           </div>`;
         renderListPicker(v.dbId);

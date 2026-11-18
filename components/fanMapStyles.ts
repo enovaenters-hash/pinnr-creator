@@ -232,16 +232,20 @@ export const FAN_CSS = `
   #pub.page .gsec-cards{display:grid;grid-template-columns:1fr;gap:10px}
   @media(min-width:761px){#pub.page .gsec-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#pub.page .gtile{width:132px}}
   /* Add the video to a group, right in the player panel. */
-  .rbtns2{display:flex;margin-top:8px}
-  .rbtn.ls{flex:1;background:rgba(255,255,255,.14);color:#fff}
-  .rbtn.ls.open{background:#fff;color:var(--ink)}
+  .svwrap{display:inline-flex;flex:0 0 auto;gap:2px}
+  .svwrap .rbtn.sv{border-radius:999px 0 0 999px;padding-right:11px}
+  .rbtn.dd{flex:0 0 auto;padding:11px 12px 11px 9px;border-radius:0 999px 999px 0;background:rgba(255,255,255,.14);color:#fff}
+  .rbtn.dd .ddc{display:inline-block;transition:transform .2s ease}
+  .rbtn.dd.open{background:#fff;color:var(--ink)}
+  .rbtn.dd.open .ddc{transform:rotate(180deg)}
+  .svwrap .rbtn.sv.on + .rbtn.dd{background:#fff;color:var(--ink);box-shadow:inset 1px 0 0 rgba(0,0,0,.12)}
   .rlists{margin-top:8px;background:rgba(255,255,255,.08);border-radius:16px;padding:10px 12px}
   .rl-h{font-size:11px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:8px}
   .rl-chips{display:flex;flex-wrap:wrap;gap:6px}
   .lchip{font-family:inherit;font-size:13px;font-weight:800;border:0;border-radius:999px;padding:7px 13px;cursor:pointer;background:rgba(255,255,255,.14);color:#fff;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .lchip.on{background:var(--accent);color:var(--accent-ink)}
   .lchip.new{background:transparent;box-shadow:inset 0 0 0 2px rgba(255,255,255,.35)}
-  .lchip:focus-visible,.rbtn.ls:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  .lchip:focus-visible,.rbtn.dd:focus-visible{outline:3px solid #fff;outline-offset:2px}
   .rl-form{display:flex;gap:6px;margin-top:8px}
   .rl-form input{flex:1;min-width:0;font-family:inherit;font-size:14px;padding:8px 12px;border:0;border-radius:999px;outline:none;background:#fff;color:var(--ink)}
 `;
