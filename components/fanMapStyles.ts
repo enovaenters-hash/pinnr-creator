@@ -146,6 +146,18 @@ export const FAN_CSS = `
     .clipnav{display:flex}
   }
 
+  /* ───── Creator page on phones: fixed split — map on top, search + list in their own box below (no pop-up sheet) ───── */
+  @media(max-width:760px){
+    #pub.embed .pubmain{display:flex;flex-direction:column}
+    #pub.embed #pubmap{position:relative;inset:auto;order:0;flex:0 0 46%;min-height:220px}
+    #pub.embed .publeft{position:relative;order:1;flex:1 1 auto;min-height:0;height:auto;transform:none;transition:none;
+      border-radius:0;box-shadow:none;border-top:2px solid var(--line);z-index:auto}
+    #pub.embed .sheethandle,#pub.embed .srch-toggle{display:none}
+    #pub.embed .publeft .srch{padding:10px 14px 6px}
+    #pub.embed .publeft .srch input{font-size:16px;padding:10px 16px}
+    #pub.embed #pubList{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  }
+
   /* ───── Full /map page: map card on top, then search + chips + list as a normal scrolling page ───── */
   #pub.page{position:static;inset:auto;z-index:auto;background:transparent;display:block}
   #pub.page .pagewrap{max-width:1024px;margin:0 auto;padding:14px 16px 64px}
