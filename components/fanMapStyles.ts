@@ -146,17 +146,10 @@ export const FAN_CSS = `
     .clipnav{display:flex}
   }
 
-  /* ───── Creator page routes: the creator's public groups as tours on the map ───── */
-  .pubgroups{display:flex;gap:6px;align-items:center;padding:10px 12px 0;overflow-x:auto;background:#fff;flex:0 0 auto;scrollbar-width:none}
-  .pubgroups[hidden]{display:none}
-  .pubgroups::-webkit-scrollbar{display:none}
-  .pubgroups .glabel{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);flex:0 0 auto;margin-right:2px}
-  .gchip{flex:0 0 auto;font:inherit;font-size:13px;font-weight:800;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap}
-  .gchip .gn{opacity:.6;font-weight:700}
-  .gchip.on{background:var(--ink);color:#fff}
-  .marker-badge.stop{top:-9px;right:-10px;min-width:20px;height:20px;line-height:17px;font-size:12px;background:var(--accent,#ffd23f);color:var(--ink);border:2px solid var(--ink)}
-  #pubList.routed{display:flex;flex-direction:column}
-  .stopnum{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:var(--ink);color:#fff;font-size:12px;font-weight:800;margin-right:8px;vertical-align:1px;font-family:var(--sans,inherit)}
+  /* ───── Creator page "Showing" menu: narrow the map and list to one of the creator's public groups ───── */
+  .gsel{flex:0 1 auto;max-width:48%;min-width:0;font:inherit;font-size:13px;font-weight:800;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:999px;padding:8px 10px;cursor:pointer;text-overflow:ellipsis}
+  .gsel[hidden]{display:none}
+  .gsel.on{background:var(--ink);color:#fff}
 
   /* ───── Creator page on phones: fixed split — map on top, search + list in their own box below (no pop-up sheet) ───── */
   @media(max-width:760px){
@@ -167,6 +160,7 @@ export const FAN_CSS = `
     #pub.embed .sheethandle,#pub.embed .srch-toggle{display:none}
     #pub.embed .publeft .srch{padding:10px 14px 6px}
     #pub.embed .publeft .srch input{font-size:16px;padding:10px 16px}
+    #pub.embed .gsel{font-size:16px;padding:9px 10px}
     #pub.embed #pubList{overflow-y:auto;-webkit-overflow-scrolling:touch}
   }
 
