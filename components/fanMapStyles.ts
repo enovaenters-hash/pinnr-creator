@@ -151,17 +151,21 @@ export const FAN_CSS = `
   .gsel[hidden]{display:none}
   .gsel.on{background:var(--ink);color:#fff}
 
-  /* ───── Creator page on phones: fixed split — map on top, search + list in their own box below (no pop-up sheet) ───── */
+  /* ───── Creator page on phones: map fills the card; one-place list strip + slim search row below (no pop-up sheet) ───── */
   @media(max-width:760px){
     #pub.embed .pubmain{display:flex;flex-direction:column}
-    #pub.embed #pubmap{position:relative;inset:auto;order:0;flex:0 0 46%;min-height:220px}
-    #pub.embed .publeft{position:relative;order:1;flex:1 1 auto;min-height:0;height:auto;transform:none;transition:none;
+    #pub.embed #pubmap{position:relative;inset:auto;order:0;flex:1 1 auto;min-height:220px}
+    #pub.embed .publeft{position:relative;order:1;flex:0 0 auto;min-height:0;height:auto;transform:none;transition:none;
       border-radius:0;box-shadow:none;border-top:2px solid var(--line);z-index:auto}
     #pub.embed .sheethandle,#pub.embed .srch-toggle{display:none}
-    #pub.embed .publeft .srch{padding:10px 14px 6px}
-    #pub.embed .publeft .srch input{font-size:16px;padding:10px 16px}
-    #pub.embed .gsel{font-size:16px;padding:9px 10px}
-    #pub.embed #pubList{overflow-y:auto;-webkit-overflow-scrolling:touch}
+    #pub.embed .publeft .srch{padding:7px 12px 3px}
+    #pub.embed .publeft .srch input{font-size:16px;line-height:1.2;padding:5px 14px}
+    #pub.embed .gsel{font-size:16px;line-height:1.2;padding:4px 10px}
+    #pub.embed #pubCount{padding:2px 14px 0;font-size:11px}
+    /* One place at a time: swipe up/down in the strip to step through the rest. */
+    #pub.embed #pubList{flex:0 0 auto;height:56px;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch}
+    #pub.embed #pubList .pcard{height:56px;box-sizing:border-box;padding:8px 14px;scroll-snap-align:start;border-bottom:0}
+    #pub.embed #pubList .pcard h4{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   }
 
   /* ───── Full /map page: map card on top, then search + chips + list as a normal scrolling page ───── */
