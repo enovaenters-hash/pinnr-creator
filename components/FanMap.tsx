@@ -160,6 +160,12 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           const { data: sv } = await getSupabase().from('saved_videos').select('video_id').eq('user_id', userId);
           (sv ?? []).forEach((r) => savedSet.add(r.video_id as string));
         }
+        // Their lists, so a video can be added to a group right from the player (My Map already loaded them).
+        if (userId && !mine) {
+          const { data: ls } = await getSupabase().from('lists').select('id, name, list_items(video_id)').eq('user_id', userId).order('created_at');
+          ((ls ?? []) as unknown as { id: string; name: string; list_items: { video_id: string }[] }[])
+            .forEach((r) => LISTS.push({ id: r.id, name: r.name, ids: new Set((r.list_items ?? []).map((i) => i.video_id)) }));
+        }
       } catch { /* saving is optional; the map still works */ }
       if (disposed) return;
 
@@ -503,7 +509,10 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
               <a class="rbtn tt" target="_blank" rel="noopener" href="https://www.tiktok.com/@${encodeURIComponent(p.creator)}/video/${encodeURIComponent(v.id)}">▶ TikTok</a>
               <button class="rbtn sv${savedSet.has(v.dbId) ? ' on' : ''}" data-act="save" data-id="${esc(v.dbId)}" aria-pressed="${savedSet.has(v.dbId)}">${savedSet.has(v.dbId) ? '♥ Saved' : '♡ Save'}</button>
             </div>
+            <div class="rbtns2"><button class="rbtn ls" type="button" data-act="lists" data-id="${esc(v.dbId)}" aria-expanded="false">＋ Add to a group</button></div>
+            <div class="rlists" hidden></div>
           </div>`;
+        renderListPicker(v.dbId);
         if (playMode) watchForSlowPlayer();
       }
 
@@ -590,8 +599,88 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           ? await supabase.from('saved_videos').delete().eq('user_id', userId).eq('video_id', dbId)
           : await supabase.from('saved_videos').insert({ user_id: userId, video_id: dbId });
         if (error) { if (was) savedSet.add(dbId); else savedSet.delete(dbId); paint(); }
-        else if (mine) window.dispatchEvent(new CustomEvent('povgo:lists-changed'));
+        else {
+          if (was) {
+            // Unsaving removes it from every group too.
+            const lids = LISTS.filter((l) => l.ids.has(dbId)).map((l) => l.id);
+            if (lids.length) {
+              await supabase.from('list_items').delete().eq('video_id', dbId).in('list_id', lids);
+              LISTS.forEach((l) => l.ids.delete(dbId));
+            }
+            if (mine) SAVED_IDS.delete(dbId);
+          } else if (mine) SAVED_IDS.add(dbId);
+          if (listsOpenFor === dbId) renderListPicker(dbId);
+          if (mine) { renderGroups(); renderListPanel(); }
+          window.dispatchEvent(new CustomEvent('povgo:lists-changed'));
+        }
       }
+
+      // ── Add the video you're watching to one of your groups (lists) without leaving the map ──
+      let listsOpenFor: string | null = null;
+      let listNew = false;
+      let listBusy = false;
+      const goLogin = (dbId: string) => { window.location.href = `/login?next=${encodeURIComponent(`/?focus=${dbId}`)}`; };
+      function renderListPicker(dbId: string) {
+        const el = $('pubRight').querySelector('.rlists') as HTMLElement | null;
+        const opener = $('pubRight').querySelector('[data-act="lists"]') as HTMLElement | null;
+        if (!el) return;
+        const open = listsOpenFor === dbId;
+        el.hidden = !open;
+        opener?.classList.toggle('open', open); opener?.setAttribute('aria-expanded', String(open));
+        if (!open) return;
+        const chips = LISTS.map((l) => {
+          const has = l.ids.has(dbId);
+          return `<button type="button" class="lchip${has ? ' on' : ''}" data-act="list" data-lid="${esc(l.id)}" data-id="${esc(dbId)}" aria-pressed="${has}">${has ? '✓ ' : ''}${esc(l.name)}</button>`;
+        }).join('');
+        const form = listNew || !LISTS.length
+          ? `<form class="rl-form" data-id="${esc(dbId)}"><input name="n" placeholder="Date night" maxlength="60" aria-label="New group name" autocomplete="off"><button class="lchip on" type="submit">Create</button></form>` : '';
+        el.innerHTML = `<div class="rl-h">${LISTS.length ? 'Add to a group' : 'Make your first group'}</div>
+          <div class="rl-chips">${chips}${listNew || !LISTS.length ? '' : '<button type="button" class="lchip new" data-act="newlist">+ New group</button>'}</div>${form}`;
+        if (listNew) (el.querySelector('input') as HTMLInputElement | null)?.focus();
+      }
+      /** Saving is what puts a video in My Videos, so adding it to a group saves it too. */
+      async function ensureSaved(dbId: string): Promise<boolean> {
+        if (savedSet.has(dbId)) return true;
+        const { error } = await getSupabase().from('saved_videos').insert({ user_id: userId, video_id: dbId });
+        if (error) return false;
+        savedSet.add(dbId); if (mine) SAVED_IDS.add(dbId);
+        const sv = $('pubRight').querySelector(`.rbtn.sv[data-id="${dbId}"]`) as HTMLElement | null;
+        if (sv) { sv.classList.add('on'); sv.setAttribute('aria-pressed', 'true'); sv.textContent = '♥ Saved'; }
+        return true;
+      }
+      async function toggleListItem(dbId: string, listId: string) {
+        if (!userId) { goLogin(dbId); return; }
+        const l = LISTS.find((x) => x.id === listId); if (!l || listBusy) return;
+        listBusy = true;
+        const sb = getSupabase();
+        let ok = true;
+        if (l.ids.has(dbId)) {
+          ok = !(await sb.from('list_items').delete().eq('list_id', listId).eq('video_id', dbId)).error;
+          if (ok) l.ids.delete(dbId);
+        } else if (await ensureSaved(dbId)) {
+          ok = !(await sb.from('list_items').insert({ list_id: listId, video_id: dbId })).error;
+          if (ok) l.ids.add(dbId);
+        } else ok = false;
+        listBusy = false;
+        if (ok) { if (mine) { renderGroups(); renderListPanel(); } changed(); }
+        renderListPicker(dbId);
+      }
+      async function createListFor(dbId: string, name: string) {
+        if (!userId || listBusy) return;
+        listBusy = true;
+        const { data: row, error } = await getSupabase().from('lists').insert({ user_id: userId, name }).select('id, name').single();
+        listBusy = false;
+        if (error || !row) return;
+        LISTS.push({ id: row.id as string, name: row.name as string, ids: new Set() });
+        listNew = false;
+        await toggleListItem(dbId, row.id as string);
+      }
+      $('pubRight').onsubmit = (e) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        const name = ((form.elements.namedItem('n') as HTMLInputElement | null)?.value || '').trim().slice(0, 60);
+        if (name && form.dataset.id) createListFor(form.dataset.id, name);
+      };
 
       // Clicks inside the player panel (clip nav, date buttons, back, collapse, reload).
       $('pubRight').onclick = (e) => {
@@ -605,6 +694,13 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           pubmap?.invalidateSize();
         }
         if (t.dataset.act === 'save' && t.dataset.id) { toggleSave(t.dataset.id, t); return; }
+        if (t.dataset.act === 'lists' && t.dataset.id) {
+          if (!userId) { goLogin(t.dataset.id); return; }
+          listsOpenFor = listsOpenFor === t.dataset.id ? null : t.dataset.id; listNew = false;
+          renderListPicker(t.dataset.id); return;
+        }
+        if (t.dataset.act === 'list' && t.dataset.id && t.dataset.lid) { toggleListItem(t.dataset.id, t.dataset.lid); return; }
+        if (t.dataset.act === 'newlist') { listNew = true; if (listsOpenFor) renderListPicker(listsOpenFor); return; }
         if (t.dataset.act === 'play') startPlayer();
         if (t.dataset.act === 'retry') startPlayer(true);
         if (t.dataset.act === 'toggle') {
