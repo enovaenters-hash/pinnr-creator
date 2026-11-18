@@ -190,6 +190,12 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       const pubActive = new Set<string>();
       let pubMarkers: Leaflet.Marker[] = [];
       let pubSel = -1, pubQuery = '';
+      // Creator groups (creator page only): the picked group's spots get numbered pins and a dashed route, in the order added.
+      type Route = { id: string; name: string; ids: string[] };
+      let ROUTES: Route[] = [];
+      let routeOn: Route | null = null;
+      const routeNum = new Map<number, number>(); // PUBSET index -> stop number
+      let routeLine: Leaflet.Polyline | null = null;
       const metaCollapsedState: Record<string, boolean> = {};
       let lastMetaCollapsed = false;
       let allCreatorVids: Vid[] = [], allCreatorLocations: Place[] = [], pubVidP: Place | null = null;
@@ -383,9 +389,10 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       }
 
       // POVGo Play Pin markers: ice blue, and sunny yellow for the place being watched.
-      function pin(count: number, selected = false, color = ICE) {
+      function pin(count: number, selected = false, color = ICE, stop?: number) {
         const size = selected ? 38 : 30;
-        const badge = count > 1 ? `<span class="marker-badge">${count}</span>` : '';
+        const badge = stop ? `<span class="marker-badge stop">${stop}</span>`
+          : count > 1 ? `<span class="marker-badge">${count}</span>` : '';
         return L.divIcon({
           className: '', iconSize: [size, size], iconAnchor: [size / 2, size - 1], popupAnchor: [0, -size],
           html: `<div style="position:relative;width:${size}px;height:${size}px">${pinSvg(size, selected ? SUN : color)}${badge}</div>`,
@@ -394,10 +401,10 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       let litMarker = -1;
       function lightMarker(i: number) {
         if (litMarker >= 0 && pubMarkers[litMarker]) {
-          pubMarkers[litMarker].setIcon(pin(PUBSET[litMarker].videos.length, false, colorOf(PUBSET[litMarker]))).setZIndexOffset(0);
+          pubMarkers[litMarker].setIcon(pin(PUBSET[litMarker].videos.length, false, colorOf(PUBSET[litMarker]), routeNum.get(litMarker))).setZIndexOffset(0);
         }
         litMarker = i;
-        if (i >= 0 && pubMarkers[i]) pubMarkers[i].setIcon(pin(PUBSET[i].videos.length, true, colorOf(PUBSET[i]))).setZIndexOffset(1000);
+        if (i >= 0 && pubMarkers[i]) pubMarkers[i].setIcon(pin(PUBSET[i].videos.length, true, colorOf(PUBSET[i]), routeNum.get(i))).setZIndexOffset(1000);
       }
 
       // On the home page the video panel floats over the right of the map, so aim the pin at the visible part.
@@ -713,6 +720,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
 
       function visiblePub(i: number) {
         const p = PUBSET[i];
+        if (routeOn && !routeNum.has(i)) return false;
         if (pubActive.size && !pubActive.has(p.cuisine)) return false;
         if (pubQuery) {
           const hay = `${p.name} ${p.city} ${p.addr} ${p.cuisine} ${p.creator} ${p.creatorName}`.toLowerCase();
@@ -748,6 +756,65 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         } else PUBSET.forEach((p, i) => el.appendChild(mkCard(p, i, CUR)));
       }
 
+      function setRoute(r: Route | null) {
+        routeOn = r; routeNum.clear();
+        if (routeLine) { pubmap?.removeLayer(routeLine); routeLine = null; }
+        const stops: number[] = [];
+        if (r) r.ids.forEach((id) => {
+          const i = PUBSET.findIndex((p) => p.videos.some((v) => v.dbId === id));
+          if (i >= 0 && !routeNum.has(i)) { stops.push(i); routeNum.set(i, stops.length); }
+        });
+        PUBSET.forEach((p, i) => pubMarkers[i]?.setIcon(pin(p.videos.length, i === litMarker, colorOf(p), routeNum.get(i))));
+        if (pubmap && stops.length > 1) {
+          routeLine = L.polyline(stops.map((i) => [PUBSET[i].lat, PUBSET[i].lon] as [number, number]),
+            { color: '#13293a', weight: 3, opacity: 0.8, dashArray: '6 8', interactive: false }).addTo(pubmap);
+        }
+        // Number the list cards and put them in route order.
+        const list = $('pubList');
+        list.querySelectorAll('.pcard').forEach((c) => {
+          const el = c as HTMLElement; const n = routeNum.get(Number(el.dataset.i));
+          el.querySelector('.stopnum')?.remove();
+          if (n) el.querySelector('h4')?.insertAdjacentHTML('afterbegin', `<span class="stopnum">${n}</span>`);
+          el.style.order = n ? String(n) : '';
+        });
+        list.classList.toggle('routed', Boolean(r));
+        document.querySelectorAll('#pubGroups .gchip').forEach((c) => {
+          const on = (c as HTMLElement).dataset.id === (r?.id ?? '');
+          c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on));
+        });
+        applyPubFilter(true);
+      }
+
+      function renderRoutes() {
+        const bar = document.getElementById('pubGroups'); if (!bar) return;
+        bar.hidden = ROUTES.length === 0;
+        bar.innerHTML = '<span class="glabel">Routes</span>'
+          + `<button type="button" class="gchip on" data-id="" aria-pressed="true">All spots</button>`
+          + ROUTES.map((r) => `<button type="button" class="gchip" data-id="${esc(r.id)}" aria-pressed="false">${esc(r.name)} <span class="gn">${r.ids.length}</span></button>`).join('');
+        bar.querySelectorAll('.gchip').forEach((b) => {
+          (b as HTMLElement).onclick = () => {
+            const id = (b as HTMLElement).dataset.id;
+            setRoute(id ? ROUTES.find((r) => r.id === id) ?? null : null);
+          };
+        });
+      }
+
+      async function loadRoutes(handle: string) {
+        const { data } = await getSupabase().from('creator_groups')
+          .select('id, name, creators!inner(tiktok_username), creator_group_items(video_id, created_at)')
+          .eq('creators.tiktok_username', handle).eq('is_public', true).order('position').order('created_at');
+        if (disposed) return;
+        const onMap = new Set(PUBSET.flatMap((p) => p.videos.map((v) => v.dbId)));
+        ROUTES = ((data ?? []) as unknown as { id: string; name: string; creator_group_items: { video_id: string; created_at: string }[] }[])
+          .map((g) => ({
+            id: g.id, name: g.name,
+            ids: (g.creator_group_items ?? []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at))
+              .map((x) => x.video_id).filter((id) => onMap.has(id)),
+          }))
+          .filter((g) => g.ids.length > 0);
+        renderRoutes();
+      }
+
       function applyPubFilter(fit?: boolean) {
         let shown = 0; const pts: [number, number][] = [];
         PUBSET.forEach((p, i) => {
@@ -777,6 +844,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (srchToggle) srchToggle.onclick = () => $('pubLeft').classList.toggle('expanded');
       $('clearBtn').onclick = () => {
         pubActive.clear();
+        if (routeOn) setRoute(null);
         document.querySelectorAll('#pubChips .pchip').forEach((chip) => { chip.classList.remove('on'); (chip as HTMLElement).style.background = ''; });
         applyPubFilter();
       };
@@ -789,6 +857,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const wantList = params.get('list');
         openMine(wantList && (wantList === 'all' || wantList === 'follow' || wantList === 'saved' || isList(wantList)) ? wantList : defaultKey());
       } else openPub(start);
+      if (embedded && CUR) loadRoutes(CUR);
       if (!mine && focusPlace && PUBSET.includes(focusPlace)) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
 
       // Other parts of the page (the creator page's top 3) can open a spot here.
@@ -877,6 +946,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           <a className="pubview" id="pubView" href="/" hidden>View page</a>
           <select className="pubsel" id="pubCreator" aria-label="Choose creator"><option>All creators</option></select>
         </div>
+        <div className="pubgroups" id="pubGroups" role="group" aria-label="Routes" hidden />
         <div className="pubchips-wrapper">
           <button className="pchip clear-btn" id="clearBtn">✕ Clear Search</button>
           <div className="pubchips-bar" id="pubChips" />

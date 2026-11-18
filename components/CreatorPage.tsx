@@ -11,9 +11,6 @@ import FanMap from '@/components/FanMap';
 type Top = Pick<Video, 'id' | 'place_name' | 'address' | 'category' | 'cover_url' | 'video_url' | 'lat' | 'featured' | 'posted_at'>;
 const FIELDS = 'id, place_name, address, category, cover_url, video_url, lat, featured, posted_at';
 
-/** One of the creator's own groups, with its visible spots newest-added first. */
-type Group = { id: string; name: string; videos: Top[] };
-
 const CAT_LABELS: Record<string, string> = { soulfood: 'Soul Food', bbq: 'BBQ', cafe: 'Café' };
 const catLabel = (c: string | null) => (c ? CAT_LABELS[c] ?? c.charAt(0).toUpperCase() + c.slice(1) : '');
 
@@ -34,8 +31,6 @@ export default function CreatorPage({ handle }: { handle: string }) {
   const [copied, setCopied] = useState(false);
   const [uid, setUid] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [groupId, setGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -66,21 +61,6 @@ export default function CreatorPage({ handle }: { handle: string }) {
         list = list.concat(((recent as Top[]) ?? []).filter((v) => !have.has(v.id))).slice(0, 3);
       }
       setTop(list);
-
-      // Their groups. Hidden videos come back as null (only the owner can read them), so drop those and empty groups.
-      const { data: g } = await supabase.from('creator_groups')
-        .select(`id, name, creator_group_items(created_at, videos(${FIELDS}))`)
-        .eq('creator_id', c.id).eq('is_public', true).order('position').order('created_at');
-      const shown = ((g ?? []) as unknown as { id: string; name: string; creator_group_items: { created_at: string; videos: Top | null }[] }[])
-        .map((r) => ({
-          id: r.id, name: r.name,
-          videos: (r.creator_group_items ?? [])
-            .sort((a, b) => b.created_at.localeCompare(a.created_at))
-            .map((i) => i.videos).filter((v): v is Top => Boolean(v)),
-        }))
-        .filter((r) => r.videos.length > 0);
-      setGroups(shown);
-      setGroupId(shown[0]?.id ?? null);
 
       const { data: mapped } = await supabase.from('videos').select('address, lat, lng')
         .eq('creator_id', c.id).eq('hidden', false).not('lat', 'is', null);
@@ -207,48 +187,6 @@ export default function CreatorPage({ handle }: { handle: string }) {
               ))}
             </ol>
           )}
-
-          {/* Their groups */}
-          {groups.length > 0 && (() => {
-            const current = groups.find((x) => x.id === groupId) ?? groups[0];
-            return (
-              <section className="mt-8" aria-labelledby="groups-heading">
-                <h2 id="groups-heading" className="text-xl sm:text-2xl font-semibold mb-3">{name}&apos;s groups</h2>
-                <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1" role="tablist" aria-label={`${name}'s groups`}>
-                  {groups.map((x) => {
-                    const on = x.id === current.id;
-                    return (
-                      <button key={x.id} role="tab" aria-selected={on} onClick={() => setGroupId(x.id)}
-                        className={`shrink-0 px-3.5 py-1.5 text-xs sm:text-sm font-extrabold rounded-full ${on ? 'bg-ink text-white' : 'bg-white text-ink border border-gray-200'}`}>
-                        {x.name} <span className={on ? 'opacity-70' : 'text-gray-400'}>{x.videos.length}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <ul role="tabpanel" aria-label={current.name}
-                  className="flex gap-2 sm:gap-4 overflow-x-auto snap-x snap-mandatory pb-2">
-                  {current.videos.map((v) => (
-                    <li key={v.id} className="shrink-0 w-[42%] sm:w-[23%] snap-start">
-                      <button onClick={() => open(v)} aria-label={`Play ${v.place_name || 'spot'}`}
-                        className="group relative block w-full aspect-[3/4] rounded-xl overflow-hidden bg-frost shadow-[0_6px_20px_rgba(19,41,58,.1)] text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sun">
-                        {v.cover_url && (
-                          <img src={v.cover_url} referrerPolicy="no-referrer" alt=""
-                            onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                        )}
-                        <span className="absolute inset-x-0 bottom-0 px-2 sm:px-3 pt-8 pb-2 sm:pb-3 bg-gradient-to-t from-black/80 to-transparent text-white">
-                          <span className="block font-display font-semibold text-[13px] sm:text-base leading-tight truncate">{v.place_name || 'Spot'}</span>
-                          <span className="block text-[10px] sm:text-xs font-bold opacity-85 truncate">
-                            {[cityOf(v.address), catLabel(v.category)].filter(Boolean).join(' · ')}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })()}
 
           {/* Their map */}
           <section id="creator-map" className="mt-8 scroll-mt-4">
