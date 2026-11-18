@@ -44,3 +44,18 @@ create policy "creator group items owner write" on public.creator_group_items
 
 create index if not exists creator_groups_creator_idx on public.creator_groups (creator_id, position, created_at);
 create index if not exists creator_group_items_video_idx on public.creator_group_items (video_id);
+
+-- ─── Public / private per group ──────────────────────────────────────────────
+-- Private groups are visible only to their creator; fans never see them or their items.
+alter table public.creator_groups add column if not exists is_public boolean not null default true;
+
+drop policy if exists "creator groups public read" on public.creator_groups;
+create policy "creator groups public read" on public.creator_groups
+  for select using (is_public or creator_id = auth.uid());
+
+drop policy if exists "creator group items public read" on public.creator_group_items;
+create policy "creator group items public read" on public.creator_group_items
+  for select using (exists (
+    select 1 from public.creator_groups g
+    where g.id = group_id and (g.is_public or g.creator_id = auth.uid())
+  ));

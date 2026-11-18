@@ -70,7 +70,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
       // Their groups. Hidden videos come back as null (only the owner can read them), so drop those and empty groups.
       const { data: g } = await supabase.from('creator_groups')
         .select(`id, name, creator_group_items(created_at, videos(${FIELDS}))`)
-        .eq('creator_id', c.id).order('position').order('created_at');
+        .eq('creator_id', c.id).eq('is_public', true).order('position').order('created_at');
       const shown = ((g ?? []) as unknown as { id: string; name: string; creator_group_items: { created_at: string; videos: Top | null }[] }[])
         .map((r) => ({
           id: r.id, name: r.name,

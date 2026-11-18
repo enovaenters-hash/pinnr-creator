@@ -17,7 +17,7 @@ const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 type Filter = 'all' | 'needs' | 'mapped';
 
 /** A creator's own group of videos, shown on their public page. */
-type Group = { id: string; name: string; videoIds: string[] };
+type Group = { id: string; name: string; isPublic: boolean; videoIds: string[] };
 
 /**
  * The creator dashboard. `embedded` drops the site bar and page frame so it can sit inside
@@ -45,14 +45,15 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
       supabase.from('creators').select('*').eq('id', session.user.id).maybeSingle(),
       supabase.from('videos').select('*').eq('creator_id', session.user.id)
         .order('posted_at', { ascending: false, nullsFirst: false }),
-      supabase.from('creator_groups').select('id, name, creator_group_items(video_id)')
+      supabase.from('creator_groups').select('id, name, is_public, creator_group_items(video_id)')
         .eq('creator_id', session.user.id).order('position').order('created_at'),
     ]);
     setCreator(c as Creator | null);
     setVideos((v as Video[]) ?? []);
     setGroupsReady(!g.error);
-    setGroups(((g.data ?? []) as unknown as { id: string; name: string; creator_group_items: { video_id: string }[] }[])
-      .map((r) => ({ id: r.id, name: r.name, videoIds: (r.creator_group_items ?? []).map((i) => i.video_id) })));
+    setGroups(((g.data ?? []) as unknown as { id: string; name: string; is_public: boolean | null; creator_group_items: { video_id: string }[] }[])
+      .map((r) => ({ id: r.id, name: r.name, isPublic: r.is_public !== false,
+        videoIds: (r.creator_group_items ?? []).map((i) => i.video_id) })));
     setLoading(false);
   }, [router, embedded]);
 
@@ -114,9 +115,9 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
     const clean = name.trim().slice(0, 40);
     if (!clean || !creator) return null;
     const { data, error } = await getSupabase().from('creator_groups')
-      .insert({ creator_id: creator.id, name: clean, position: groups.length }).select('id, name').single();
+      .insert({ creator_id: creator.id, name: clean, position: groups.length }).select('id, name, is_public').single();
     if (error || !data) { setStatus({ text: 'Couldn’t create that group. Try again.', tone: 'err' }); return null; }
-    setGroups((gs) => [...gs, { id: data.id, name: data.name, videoIds: [] }]);
+    setGroups((gs) => [...gs, { id: data.id, name: data.name, isPublic: data.is_public !== false, videoIds: [] }]);
     setStatus({ text: `Group “${data.name}” created`, tone: 'ok' });
     return data.id;
   }
@@ -128,6 +129,14 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
     setGroups((gs) => gs.map((g) => (g.id === id ? { ...g, name: clean } : g)));
     const { error } = await getSupabase().from('creator_groups').update({ name: clean }).eq('id', id);
     if (error) { setGroups(before); setStatus({ text: 'Couldn’t rename that group. Try again.', tone: 'err' }); }
+  }
+
+  async function setGroupPublic(id: string, isPublic: boolean) {
+    const before = groups;
+    setGroups((gs) => gs.map((g) => (g.id === id ? { ...g, isPublic } : g)));
+    const { error } = await getSupabase().from('creator_groups').update({ is_public: isPublic }).eq('id', id);
+    if (error) { setGroups(before); setStatus({ text: 'Couldn’t change who can see that group. Try again.', tone: 'err' }); }
+    else setStatus({ text: isPublic ? 'Group is public: fans can see it' : 'Group is private: only you can see it', tone: 'ok' });
   }
 
   async function deleteGroup(id: string) {
@@ -253,7 +262,7 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
 
         {/* Groups */}
         <GroupsPanel ready={groupsReady} groups={groups} onCreate={createGroup}
-          onRename={renameGroup} onDelete={deleteGroup} />
+          onRename={renameGroup} onDelete={deleteGroup} onSetPublic={setGroupPublic} />
 
         {/* Videos */}
         <section>
@@ -412,11 +421,12 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 }
 
 /** The creator's groups: make, rename and delete them. Spots are added from each video's "+ Group" button. */
-function GroupsPanel({ ready, groups, onCreate, onRename, onDelete }: {
+function GroupsPanel({ ready, groups, onCreate, onRename, onDelete, onSetPublic }: {
   ready: boolean; groups: Group[];
   onCreate: (name: string) => Promise<string | null>;
   onRename: (id: string, name: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onSetPublic: (id: string, isPublic: boolean) => Promise<void>;
 }) {
   const [newName, setNewName] = useState('');
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -427,7 +437,7 @@ function GroupsPanel({ ready, groups, onCreate, onRename, onDelete }: {
     <section className="card p-5 mb-8" aria-labelledby="groups-heading">
       <h2 id="groups-heading" className="text-xl font-semibold">Your groups</h2>
       <p className="text-sm text-gray-600 mt-1">
-        Bundle your spots into groups like <em>Date night</em> or <em>Best tacos</em>. Fans see them on your public page.
+        Bundle your spots into groups like <em>Date night</em> or <em>Best tacos</em>. Public groups show on your page; private ones only you can see.
       </p>
       {!ready ? (
         <p className="mt-3 text-sm text-amber-700">Groups aren&apos;t switched on yet. Run <code>supabase/creator-groups.sql</code> in Supabase, then refresh.</p>
@@ -450,7 +460,13 @@ function GroupsPanel({ ready, groups, onCreate, onRename, onDelete }: {
                     <>
                       <span className="font-semibold text-sm truncate">{g.name}</span>
                       <span className="text-xs text-gray-500">{g.videoIds.length} spot{g.videoIds.length === 1 ? '' : 's'}</span>
-                      <span className="ml-auto flex items-center gap-3 text-xs">
+                      <span className="inline-flex p-0.5 rounded-full bg-frost text-[11px] font-extrabold" role="group" aria-label={`Who can see ${g.name}`}>
+                        <button type="button" onClick={() => !g.isPublic && onSetPublic(g.id, true)} aria-pressed={g.isPublic}
+                          className={`px-2.5 py-1 rounded-full ${g.isPublic ? 'bg-ink text-white' : 'text-gray-600'}`}>Public</button>
+                        <button type="button" onClick={() => g.isPublic && onSetPublic(g.id, false)} aria-pressed={!g.isPublic}
+                          className={`px-2.5 py-1 rounded-full ${!g.isPublic ? 'bg-ink text-white' : 'text-gray-600'}`}>Private</button>
+                      </span>
+                      <span className="ml-auto flex items-center gap-4 text-xs">
                         {confirmDelete === g.id ? (
                           <>
                             <span className="text-gray-600">Delete this group?</span>
@@ -502,7 +518,7 @@ function GroupPicker({ videoId, groups, onToggle, onCreate }: {
           return (
             <button key={g.id} type="button" onClick={() => onToggle(g.id, videoId)} aria-pressed={inIt}
               className={`px-3 py-1.5 text-xs font-extrabold rounded-full ${inIt ? 'bg-ink text-white' : 'bg-white text-ink border border-gray-200'}`}>
-              {inIt ? '✓ ' : ''}{g.name}
+              {inIt ? '✓ ' : ''}{g.name}{g.isPublic ? '' : ' 🔒'}
             </button>
           );
         })}
