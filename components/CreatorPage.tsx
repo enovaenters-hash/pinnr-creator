@@ -7,6 +7,8 @@ import type { Creator, Video } from '@/lib/types';
 import SiteNav from '@/components/SiteNav';
 import BottomNav from '@/components/BottomNav';
 import FanMap from '@/components/FanMap';
+import PosterTile from '@/components/PosterTile';
+import type { PublicVideo } from '@/components/PublicMap';
 
 type Top = Pick<Video, 'id' | 'place_name' | 'address' | 'category' | 'cover_url' | 'video_url' | 'lat' | 'featured' | 'posted_at'>;
 const FIELDS = 'id, place_name, address, category, cover_url, video_url, lat, featured, posted_at';
@@ -31,6 +33,15 @@ export default function CreatorPage({ handle }: { handle: string }) {
   const [copied, setCopied] = useState(false);
   const [uid, setUid] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
+  const [vids, setVids] = useState<PublicVideo[] | null>(null);
+  const [filt, setFilt] = useState<{ ids: string[]; cats: string[]; group: string | null; query: string } | null>(null);
+
+  // The map tells us what its filters leave visible; the grid below shows the newest 12 of those.
+  useEffect(() => {
+    const on = (e: Event) => setFilt((e as CustomEvent).detail);
+    window.addEventListener('povgo:filtered', on);
+    return () => window.removeEventListener('povgo:filtered', on);
+  }, []);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -61,6 +72,12 @@ export default function CreatorPage({ handle }: { handle: string }) {
         list = list.concat(((recent as Top[]) ?? []).filter((v) => !have.has(v.id))).slice(0, 3);
       }
       setTop(list);
+
+      const { data: all } = await supabase.from('videos')
+        .select('*, creators(tiktok_username, display_name, content_type, content_types)')
+        .eq('creator_id', c.id).eq('hidden', false).not('lat', 'is', null)
+        .order('posted_at', { ascending: false, nullsFirst: false });
+      setVids((all as PublicVideo[]) ?? []);
 
       const { data: mapped } = await supabase.from('videos').select('address, lat, lng')
         .eq('creator_id', c.id).eq('hidden', false).not('lat', 'is', null);
@@ -196,6 +213,39 @@ export default function CreatorPage({ handle }: { handle: string }) {
             </h2>
             <FanMap initialCreator={handle} embedded />
           </section>
+
+          {/* Videos that match the map's category, group and search filters: newest 12, Explore-style */}
+          {(() => {
+            const keep = filt ? new Set(filt.ids) : null;
+            const shown = (vids ?? []).filter((v) => !keep || keep.has(v.id)).slice(0, 12);
+            const label = filt?.cats.length ? filt.cats.join(' + ') : filt?.group ?? null;
+            return (
+              <section className="mt-8" aria-labelledby="creator-videos">
+                <h2 id="creator-videos" className="text-xl sm:text-2xl font-semibold mb-1">
+                  {label ? `${label} videos` : `${name}'s videos`}
+                </h2>
+                <p className="text-sm text-gray-500 mb-3">
+                  {label || filt?.query ? 'Matches what the map is showing · newest first' : 'Newest first · pick a category on the map to filter'}
+                </p>
+                {vids === null ? (
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                    {Array.from({ length: 6 }, (_, i) => <div key={i} className="rounded-2xl bg-white animate-pulse aspect-[4/5] sm:aspect-[4/3]" />)}
+                  </div>
+                ) : shown.length === 0 ? (
+                  <p className="card p-5 text-sm text-gray-600">No videos match. Tap Clear Search on the map to see them all.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                    {shown.map((v) => (
+                      <PosterTile key={v.id} video={v} type={v.category ? catLabel(v.category) : undefined} onOpen={() => {
+                        document.getElementById('creator-map')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        window.dispatchEvent(new CustomEvent('povgo:focus', { detail: { id: v.id, play: true } }));
+                      }} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })()}
         </div>
       </main>
       <BottomNav />

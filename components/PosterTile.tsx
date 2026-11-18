@@ -6,11 +6,18 @@ export const TYPE_DOT: Record<string, string> = {
 };
 
 /** A video as a poster: cover picture, a badge at the top left, and the place name over the bottom. Opens it on the map. */
-export default function PosterTile({ video, rank, type }: { video: PublicVideo; rank?: number; type?: string }) {
+export default function PosterTile({ video, rank, type, onOpen }: {
+  video: PublicVideo; rank?: number; type?: string;
+  /** Open it somewhere on this page (the creator page's map) instead of linking to the home map. */
+  onOpen?: () => void;
+}) {
   const handle = video.creators?.tiktok_username;
+  const cls = 'group relative block w-full text-left overflow-hidden rounded-2xl bg-gradient-to-br from-ice to-frost aspect-[4/5] sm:aspect-[4/3] border-2 border-transparent hover:border-ice transition-colors';
+  const Wrap = ({ children }: { children: React.ReactNode }) => onOpen
+    ? <button type="button" onClick={onOpen} className={cls} aria-label={`Play ${video.place_name || 'spot'}`}>{children}</button>
+    : <Link href={`/?focus=${video.id}`} className={cls}>{children}</Link>;
   return (
-    <Link href={`/?focus=${video.id}`}
-      className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-ice to-frost aspect-[4/5] sm:aspect-[4/3] border-2 border-transparent hover:border-ice transition-colors">
+    <Wrap>
       {video.cover_url && (
         <img src={video.cover_url} referrerPolicy="no-referrer" alt="" loading="lazy"
           onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
@@ -29,6 +36,6 @@ export default function PosterTile({ video, rank, type }: { video: PublicVideo; 
           {[handle ? `@${handle}` : null, video.address].filter(Boolean).join(' · ')}
         </p>
       </div>
-    </Link>
+    </Wrap>
   );
 }

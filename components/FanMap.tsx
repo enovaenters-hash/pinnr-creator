@@ -800,6 +800,14 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           else if (pts.length) pubmap!.fitBounds(L.latLngBounds(pts).pad(0.2));
           else pubmap!.setView([39.5, -98.35], 4);
         }
+        // The creator page shows a video grid under the map that follows the same filters.
+        if (embedded) {
+          const ids = PUBSET.filter((_, i) => visiblePub(i)).flatMap((p) => p.videos.map((v) => v.dbId));
+          const cats = [...pubActive].map(cLabel);
+          const group = (document.getElementById('pubGroupSel') as HTMLSelectElement | null);
+          const groupName = group && group.value ? (group.selectedOptions[0]?.text ?? '').replace(/ · \d+$/, '') : null;
+          window.dispatchEvent(new CustomEvent('povgo:filtered', { detail: { ids, cats, group: groupName, query: pubQuery } }));
+        }
       }
 
       ($('pubSearch') as HTMLInputElement).oninput = (e) => { pubQuery = (e.target as HTMLInputElement).value.toLowerCase(); applyPubFilter(); };
