@@ -55,6 +55,11 @@ export const FAN_CSS = `
   .pcard .by{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--muted);margin:3px 0 4px}
   .pcard .by .d{width:7px;height:7px;border-radius:50%}
   .pcard .mt{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:3px}
+  .pcard .ctop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .pcard .ctop h4{min-width:0;flex:1 1 auto;overflow-wrap:anywhere}
+  .pcard .crow{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;margin-top:4px}
+  .pcard .crow .by{margin:0;flex:0 0 auto}
+  .pcard .crow .mt{margin:0;min-width:0;flex:0 1 auto}
   .pcard .cz{font-size:10px;font-weight:800;color:#fff;border-radius:999px;padding:1px 8px}
   .pcard .star{font-size:9.5px;font-weight:900;color:var(--ink);background:var(--accent);border-radius:999px;padding:1px 7px}
   #pubmap{flex:1;min-width:0;position:relative;overflow:hidden}
@@ -249,7 +254,7 @@ export const FAN_CSS = `
   #pub.page .lp-form input{flex:1 1 180px;min-width:0;font-family:inherit;font-size:15px;padding:9px 14px;border:2px solid var(--line);border-radius:999px;outline:none}
   #pub.page .lp-form input:focus{border-color:var(--bar);box-shadow:0 0 0 3px var(--frost)}
   #pub.page .lp-hint{margin:10px 0 0;font-size:13px;font-weight:700;color:var(--muted)}
-  #pub.page .premove{margin-top:8px;font-family:inherit;font-size:12px;font-weight:800;color:var(--ink);background:#fff;border:0;border-radius:999px;padding:5px 12px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+  #pub.page .premove{flex:0 0 auto;margin:-2px 0 0;white-space:nowrap;font-family:inherit;font-size:12px;font-weight:800;color:var(--ink);background:#fff;border:0;border-radius:999px;padding:5px 12px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
   /* My Map groups: photo buttons under the map (All, Following, Saved, each list), and a section per group when All is picked. */
   #pub.page .gpick{display:flex;gap:10px;margin:14px 0 0;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
   #pub.page .gtile{flex:0 0 auto;width:100px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:stretch;text-align:left;font-family:inherit;color:var(--ink);background:#fff;border:0;border-radius:18px;padding:0 0 9px;cursor:pointer;overflow:hidden;box-shadow:inset 0 0 0 2px var(--line),0 4px 14px rgba(19,41,58,.06);border-top:5px solid var(--gc,var(--line))}

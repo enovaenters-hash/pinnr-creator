@@ -713,10 +713,12 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const el = $('pubList'); el.innerHTML = '';
         const mkCard = (p: Place, i: number, gk: string | null) => {
           const card = document.createElement('div'); card.className = 'pcard' + (i === pubSel ? ' on' : ''); card.dataset.i = String(i);
-          card.innerHTML = `<h4>${esc(p.name)}</h4>
-            ${combinedMode ? `<div class="by"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a></div>` : ''}
-            <div class="mt"><span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}</div>
-            ${mine && isList(gk) ? '<button class="premove" type="button">Remove from list</button>' : ''}`;
+          const remove = mine && isList(gk) ? '<button class="premove" type="button">Remove</button>' : '';
+          const by = combinedMode ? `<span class="by"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a></span>` : '';
+          const mt = `<span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}`;
+          // Name (with Remove far right) on top; creator, label and city share the next line.
+          card.innerHTML = `<div class="ctop"><h4>${esc(p.name)}</h4>${remove}</div>
+            <div class="crow">${by}<span class="mt">${mt}</span></div>`;
           card.onclick = () => selectPub(i, undefined, true);
           const rm = card.querySelector('.premove') as HTMLElement | null;
           if (rm) rm.onclick = (ev) => { ev.stopPropagation(); removeFromList(p, gk!); };
