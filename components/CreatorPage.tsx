@@ -7,6 +7,7 @@ import type { Creator, Video } from '@/lib/types';
 import SiteNav from '@/components/SiteNav';
 import BottomNav from '@/components/BottomNav';
 import FanMap from '@/components/FanMap';
+import CreatorVideos from '@/components/CreatorVideos';
 
 type Top = Pick<Video, 'id' | 'place_name' | 'address' | 'category' | 'cover_url' | 'video_url' | 'lat' | 'featured' | 'posted_at'>;
 const FIELDS = 'id, place_name, address, category, cover_url, video_url, lat, featured, posted_at';
@@ -196,6 +197,9 @@ export default function CreatorPage({ handle }: { handle: string }) {
             </h2>
             <FanMap initialCreator={handle} embedded />
           </section>
+
+          {/* Their groups and videos, under the map and list */}
+          {creator && <CreatorVideos creator={creator} />}
         </div>
       </main>
       <BottomNav />

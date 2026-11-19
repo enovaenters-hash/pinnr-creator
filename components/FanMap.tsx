@@ -106,6 +106,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
     let onPlayerMessage: ((e: MessageEvent) => void) | null = null;
     let onFocus: ((e: Event) => void) | null = null;
     let onDocClick: ((e: MouseEvent) => void) | null = null;
+    let onGroup: ((e: Event) => void) | null = null;
 
     (async () => {
       const L = (await import('leaflet')).default;
@@ -758,8 +759,6 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const g = GROUPS.find((x) => x.id === id) ?? null;
         groupOn = Boolean(g); groupIdx.clear();
         if (g) PUBSET.forEach((p, i) => { if (p.videos.some((v) => g.ids.includes(v.dbId))) groupIdx.add(i); });
-        const s = document.getElementById('pubGroupSel') as HTMLSelectElement | null;
-        if (s) { s.value = g?.id ?? ''; s.classList.toggle('on', Boolean(g)); }
         applyPubFilter(true);
       }
 
@@ -772,12 +771,6 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         GROUPS = ((data ?? []) as unknown as { id: string; name: string; creator_group_items: { video_id: string }[] }[])
           .map((g) => ({ id: g.id, name: g.name, ids: (g.creator_group_items ?? []).map((x) => x.video_id).filter((id) => onMap.has(id)) }))
           .filter((g) => g.ids.length > 0);
-        const s = document.getElementById('pubGroupSel') as HTMLSelectElement | null;
-        if (!s) return;
-        s.innerHTML = `<option value="">All spots</option>`
-          + GROUPS.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} · ${g.ids.length}</option>`).join('');
-        s.hidden = GROUPS.length === 0;
-        s.onchange = () => setGroup(s.value);
       }
 
       function applyPubFilter(fit?: boolean) {
@@ -834,6 +827,9 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         if (play) startPlayer();
       };
       window.addEventListener('povgo:focus', onFocus);
+      // The group buttons under the creator's map (CreatorVideos) narrow this map and list.
+      onGroup = (e: Event) => setGroup(((e as CustomEvent<{ id: string | null }>).detail?.id) ?? '');
+      window.addEventListener('povgo:group', onGroup);
 
       // Home page: tapping a spot card elsewhere on the page (/?focus=<id>) opens it on this map without a reload.
       if (home) {
@@ -856,6 +852,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (onPlayerMessage) window.removeEventListener('message', onPlayerMessage);
       if (onFocus) window.removeEventListener('povgo:focus', onFocus);
       if (onDocClick) document.removeEventListener('click', onDocClick, true);
+      if (onGroup) window.removeEventListener('povgo:group', onGroup);
       pubmap?.remove(); pubmap = null;
     };
   }, [initialCreator, embedded, home, view, mine]);
@@ -920,7 +917,6 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
             <div className="sheethandle" id="sheetHandle" />
             <div className="srch">
               <input id="pubSearch" placeholder="Search places…" autoComplete="off" />
-              <select id="pubGroupSel" className="gsel" aria-label="Showing" hidden />
               <button className="srch-toggle" id="srchToggle">▼</button>
             </div>
             <div id="pubCount" />
