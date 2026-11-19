@@ -258,9 +258,20 @@ export const FAN_CSS = `
   #pub.page .gtile:focus-visible{outline:3px solid var(--bar);outline-offset:2px}
   #pub.page .gtile .gnm{font-family:var(--display);font-weight:600;font-size:14px;line-height:1.2;padding:7px 10px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #pub.page .gtile .gct{font-size:11px;font-weight:800;color:var(--muted);padding:1px 10px 0}
-  #pub.page .gtile.new{border-top-color:transparent;background:transparent;box-shadow:inset 0 0 0 2px var(--line);border-style:dashed;justify-content:center;align-items:center;min-height:120px;border-top:0;box-shadow:none;border:2px dashed var(--line);padding:0}
-  #pub.page .gtile.new .gnm{padding:2px 0 0;text-align:center}
-  #pub.page .gtile.new .gplus{font-size:30px;font-weight:700;line-height:1;color:var(--glacier,#1c7fb0)}
+  #pub.page .gtile.new{display:flex;flex-direction:column;justify-content:center;gap:8px;padding:10px;background:transparent;box-shadow:none;border:2px dashed var(--line);border-radius:18px;min-width:112px;width:auto;cursor:default}
+  #pub.page .gtile.new.form{min-width:150px}
+  #pub.page .gtile.ed{width:132px;cursor:default;padding-bottom:9px}
+  #pub.page .gtile.ed .gnm{white-space:normal}
+  #pub.page .gbtns{display:flex;flex-direction:column;gap:5px;padding:6px 8px 0}
+  #pub.page .gtile.new .gbtns{padding:0;flex-direction:row;flex-wrap:wrap}
+  #pub.page .gnb{font-family:inherit;font-size:12px;font-weight:800;color:var(--ink);background:#fff;border:0;border-radius:999px;padding:7px 12px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line);white-space:nowrap}
+  #pub.page .gnb:hover{box-shadow:inset 0 0 0 2px var(--ink)}
+  #pub.page .gnb.sun{background:var(--accent);box-shadow:0 2px 0 #f2c21a}
+  #pub.page .gnb.danger{background:#d92d20;color:#fff;box-shadow:none}
+  #pub.page .gform{display:flex;flex-direction:column;gap:6px;margin:0;padding:6px 8px 0}
+  #pub.page .gtile.new .gform{padding:0}
+  #pub.page .gform input{min-width:0;width:100%;font-family:inherit;font-size:16px;padding:7px 12px;border:2px solid var(--line);border-radius:999px;outline:none;box-sizing:border-box}
+  #pub.page .gform input:focus{border-color:var(--bar);box-shadow:0 0 0 3px var(--frost)}
   #pub.page .gph{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;height:66px;background:var(--frost,#dff4fc);overflow:hidden;color:var(--bar)}
   #pub.page .gph img{width:100%;height:100%;object-fit:cover;display:block;min-width:0;min-height:0}
   #pub.page .gph.n1 img{grid-column:1/3;grid-row:1/3}

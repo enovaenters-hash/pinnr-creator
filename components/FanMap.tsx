@@ -116,29 +116,25 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       const LISTS: MineList[] = [];
       let mineUser: string | null = null;
       const SAVED_IDS = new Set<string>();   // videos the fan saved
-      const FOLLOWED = new Set<string>();    // creators the fan follows
       if (mine) {
         // Only this fan's saved videos, plus their lists.
         const sb = getSupabase();
         const { data: { session } } = await sb.auth.getSession();
         mineUser = session?.user.id ?? null;
         if (mineUser) {
-          const [sv, ls, fo] = await Promise.all([
+          const [sv, ls] = await Promise.all([
             sb.from('saved_videos').select('video_id').eq('user_id', mineUser),
             sb.from('lists').select('id, name, list_items(video_id)').eq('user_id', mineUser).order('created_at'),
-            sb.from('follows').select('creator_id').eq('user_id', mineUser),
           ]);
           ((ls.data ?? []) as unknown as { id: string; name: string; list_items: { video_id: string }[] }[])
             .forEach((r) => LISTS.push({ id: r.id, name: r.name, ids: new Set((r.list_items ?? []).map((i) => i.video_id)) }));
           const ids = (sv.data ?? []).map((r) => r.video_id as string);
           ids.forEach((i) => SAVED_IDS.add(i));
-          (fo.data ?? []).forEach((r) => FOLLOWED.add(r.creator_id as string));
-          // Everything from creators they follow, plus any videos they saved from anyone else.
-          const parts: string[] = [];
-          if (ids.length) parts.push(`id.in.(${ids.join(',')})`);
-          if (FOLLOWED.size) parts.push(`creator_id.in.(${[...FOLLOWED].join(',')})`);
-          if (parts.length) {
-            const res = await sb.from('videos').select(ROW_FIELDS).or(parts.join(',')).eq('hidden', false).not('lat', 'is', null)
+          // Only what they saved or put in a group.
+          const want = new Set<string>(ids);
+          LISTS.forEach((l) => l.ids.forEach((i) => want.add(i)));
+          if (want.size) {
+            const res = await sb.from('videos').select(ROW_FIELDS).in('id', [...want]).eq('hidden', false).not('lat', 'is', null)
               .order('posted_at', { ascending: false }).limit(3000);
             data = res.data;
           }
@@ -171,11 +167,6 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (disposed) return;
 
       const { places: ALL, creators: CREATORS } = groupPlaces((data ?? []) as unknown as Row[]);
-      const followHandles = new Set<string>();
-      let followCount = 0;
-      ((data ?? []) as unknown as Row[]).forEach((r) => {
-        if (FOLLOWED.has(r.creator_id)) { followHandles.add(r.creators?.tiktok_username ?? 'unknown'); followCount++; }
-      });
       const params = new URLSearchParams(window.location.search);
       const focusId = params.get('focus');
       const want = (params.get('creator') ?? initialCreator ?? '').replace(/^@/, '').toLowerCase();
@@ -211,30 +202,26 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const h = sel.value || null;
         const url = new URL(window.location.href);
         url.searchParams.delete('focus');
-        if (mine) { if (h && h !== 'follow') url.searchParams.set('list', h); else url.searchParams.delete('list'); }
+        if (mine) { if (h) url.searchParams.set('list', h); else url.searchParams.delete('list'); }
         else if (h) url.searchParams.set('creator', h); else url.searchParams.delete('creator');
         window.history.replaceState(null, '', url);
-        if (mine) openMine(h || 'follow'); else openPub(h);
+        if (mine) openMine(h || 'all'); else openPub(h);
       };
 
-      // ── My Map: groups (Following, Saved and the fan's own lists) are buttons under the map ──
-      // key: 'all' (every group at once), 'follow' (creators I follow), 'saved' (everything I saved) or a list id.
+      // ── Group Maps: the fan's own groups (lists) are photo buttons under the map ──
+      // key: 'all' (every group at once), a list id, or NONE for spots saved before groups were required.
       type GDef = { key: string; name: string; color: string };
       const LIST_COLORS = ['#e8590c', '#2fb77a', '#8a5cf0', '#e05aa8', '#0ea5a4', '#d9480f', '#4263eb', '#a8872c'];
-      const SAVED_COLOR = '#7c8da0';
-      const groupDefs = (): GDef[] => [
-        { key: 'follow', name: 'Following', color: ICE },
-        { key: 'saved', name: 'Saved', color: SAVED_COLOR },
-        ...LISTS.map((l, i) => ({ key: l.id, name: l.name, color: LIST_COLORS[i % LIST_COLORS.length] })),
-      ];
-      const gdef = (k: string | null | undefined) => groupDefs().find((g) => g.key === k);
-      const inGroup = (k: string, p: Place, v: Vid) =>
-        k === 'follow' ? followHandles.has(p.creator) : k === 'saved' ? SAVED_IDS.has(v.dbId) : !!LISTS.find((l) => l.id === k)?.ids.has(v.dbId);
-      /** Group order for pin colour and for the sections under "All": lists first (the fan made them), then Following, then Saved. */
-      const colorOrder = () => [...LISTS.map((l) => l.id), 'follow', 'saved'];
-      const sectionOrder = () => ['follow', ...LISTS.map((l) => l.id), 'saved'];
-      /** In "All", Saved only gets its own section for places that are in no other group. */
-      const secKeys = (p: Place) => (p.gks ?? []).filter((k) => k !== 'saved' || (p.gks ?? []).length === 1);
+      const NONE = 'none', NONE_COLOR = '#7c8da0';
+      const groupDefs = (): GDef[] => LISTS.map((l, i) => ({ key: l.id, name: l.name, color: LIST_COLORS[i % LIST_COLORS.length] }));
+      const gdef = (k: string | null | undefined): GDef | undefined =>
+        k === NONE ? { key: NONE, name: 'No group yet', color: NONE_COLOR } : groupDefs().find((g) => g.key === k);
+      const inGroup = (k: string, _p: Place, v: Vid) =>
+        k === NONE ? SAVED_IDS.has(v.dbId) && !LISTS.some((l) => l.ids.has(v.dbId)) : !!LISTS.find((l) => l.id === k)?.ids.has(v.dbId);
+      /** Pin colour and section order under "All": the fan's groups in order, then spots with no group yet. */
+      const colorOrder = () => [...LISTS.map((l) => l.id), NONE];
+      const sectionOrder = () => colorOrder();
+      const secKeys = (p: Place) => p.gks ?? [];
       const placesFor = (key: string): Place[] => {
         if (key === 'all') {
           const order = colorOrder();
@@ -250,7 +237,8 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       const defaultKey = () => 'all';
       const isList = (k: string | null) => !!k && LISTS.some((x) => x.id === k);
       const spotWord = (n: number) => `${n} spot${n === 1 ? '' : 's'}`;
-      let lpMode: 'idle' | 'rename' | 'new' | 'delete' = 'idle';
+      let gMode: 'idle' | 'new' | 'edit' = 'idle';
+      let gRename: string | null = null, gDelete: string | null = null;
       let lpBusy = false;
       const changed = () => window.dispatchEvent(new CustomEvent('povgo:lists-changed'));
       /** Up to four cover photos from these places, as a little collage. */
@@ -267,97 +255,87 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const tile = (key: string, name: string, color: string, ps: Place[]) =>
           `<button type="button" class="gtile${CUR === key ? ' on' : ''}" data-g="${esc(key)}" style="--gc:${color}" aria-pressed="${CUR === key}">
             ${collage(coversOf(ps))}<span class="gnm">${esc(name)}</span><span class="gct">${spotWord(ps.length)}</span></button>`;
+        const editTile = (g: GDef) => {
+          const pics = collage(coversOf(placesFor(g.key)));
+          let body: string;
+          if (gDelete === g.key) body = `<span class="gnm">Delete?</span><span class="gct">Spots stay saved</span><span class="gbtns"><button type="button" class="gnb danger" data-ga="delete-yes" data-lid="${esc(g.key)}">Delete</button><button type="button" class="gnb" data-ga="cancel">Keep</button></span>`;
+          else if (gRename === g.key) body = `<form class="gform" data-gform="rename" data-lid="${esc(g.key)}"><input name="n" value="${esc(g.name)}" maxlength="60" aria-label="Group name" autocomplete="off"><span class="gbtns"><button type="submit" class="gnb sun">Save</button><button type="button" class="gnb" data-ga="cancel">Cancel</button></span></form>`;
+          else body = `<span class="gnm">${esc(g.name)}</span><span class="gbtns"><button type="button" class="gnb" data-ga="rename" data-lid="${esc(g.key)}">Rename</button><button type="button" class="gnb" data-ga="delete" data-lid="${esc(g.key)}">Delete</button></span>`;
+          return `<div class="gtile ed" style="--gc:${g.color}">${pics}${body}</div>`;
+        };
+        const last = gMode === 'new'
+          ? `<div class="gtile new form"><form class="gform" data-gform="new"><input name="n" placeholder="Date night" maxlength="60" aria-label="New group name" autocomplete="off"><span class="gbtns"><button type="submit" class="gnb sun">Create</button><button type="button" class="gnb" data-ga="cancel">Cancel</button></span></form></div>`
+          : gMode === 'edit'
+            ? `<div class="gtile new"><button type="button" class="gnb sun" data-ga="done">Done</button></div>`
+            : `<div class="gtile new"><button type="button" class="gnb" data-ga="new">+ New list</button>${LISTS.length ? '<button type="button" class="gnb" data-ga="edit">Edit groups</button>' : ''}</div>`;
         el.innerHTML = tile('all', 'All', INK, placesFor('all'))
-          + groupDefs().map((g) => tile(g.key, g.name, g.color, placesFor(g.key))).join('')
-          + `<button type="button" class="gtile new" data-new="1"><span class="gplus" aria-hidden="true">+</span><span class="gnm">New list</span></button>`;
+          + groupDefs().map((g) => (gMode === 'edit' ? editTile(g) : tile(g.key, g.name, g.color, placesFor(g.key)))).join('')
+          + last;
+        const inp = el.querySelector('input'); if (inp) { (inp as HTMLInputElement).focus(); (inp as HTMLInputElement).select(); }
       }
       function openMine(key: string) {
-        CUR = key === 'all' || key === 'follow' || key === 'saved' || isList(key) ? key : 'all';
+        CUR = key === 'all' || isList(key) ? key : 'all';
         combinedMode = true; ACCENT = SUN;
         $('pub').style.setProperty('--accent', ACCENT);
         PUBSET = placesFor(CUR);
-        lpMode = 'idle';
         $('pubPfp').innerHTML = HOME_PIN;
         $('pubName').textContent = CUR === 'all' ? 'All' : gdef(CUR)?.name ?? 'All';
         $('pubHandle').textContent = `${spotWord(PUBSET.length)} · tap a pin to watch`;
         showPub();
         renderGroups();
-        renderListPanel();
       }
-      function renderListPanel() {
-        const el = document.getElementById('pubListEdit'); if (!el) return;
-        const l = LISTS.find((x) => x.id === CUR);
-        const title = CUR === 'all' ? 'All' : gdef(CUR)?.name ?? 'All';
-        let body = '';
-        if (lpMode === 'rename' && l) {
-          body = `<form class="lp-form" data-lp-form="rename"><input name="n" value="${esc(l.name)}" maxlength="60" aria-label="List name" autocomplete="off">
-            <button class="lp-btn sun" type="submit">Save</button><button class="lp-btn" type="button" data-lp="cancel">Cancel</button></form>`;
-        } else if (lpMode === 'new') {
-          body = `<form class="lp-form" data-lp-form="new"><input name="n" placeholder="Date night" maxlength="60" aria-label="New list name" autocomplete="off">
-            <button class="lp-btn sun" type="submit">Create</button><button class="lp-btn" type="button" data-lp="cancel">Cancel</button></form>`;
-        } else if (lpMode === 'delete' && l) {
-          body = `<div class="lp-confirm">Delete “${esc(l.name)}”? Its spots stay saved.
-            <button class="lp-btn danger" type="button" data-lp="delete-yes">Delete</button><button class="lp-btn" type="button" data-lp="cancel">Keep</button></div>`;
-        } else if (l) {
-          body = `<div class="lp-btns"><button class="lp-btn" type="button" data-lp="rename">Rename</button><button class="lp-btn" type="button" data-lp="delete">Delete list</button></div>`;
-        }
-        const what = CUR === 'all' ? 'Every group at once, each in its own pin color.'
-          : CUR === 'saved' ? 'Everything you saved.'
-          : CUR === 'follow' ? (FOLLOWED.size ? 'Spots from the creators you follow.' : 'Follow a few creators and their spots will show up here.') : '';
-        const hint = !l && lpMode === 'idle'
-          ? `<p class="lp-hint">${what} ${LISTS.length ? 'Pick one of your lists above to rename or delete it.' : 'Make a list like “Date night” with the + New list button.'}</p>` : '';
-        const empty = l && !PUBSET.length ? `<p class="lp-hint">This list is empty. Open Saved and tap “+ List” on a video to add it here.</p>` : '';
-        el.innerHTML = `<div class="lp-head"><h3>${esc(title)}</h3><span class="lp-n">${spotWord(PUBSET.length)}</span></div>${body}${hint}${empty}`;
-        el.querySelector('input')?.focus();
-      }
-      // Group buttons under the map: pick one, or start a new list.
-      document.getElementById('pubGroups')?.addEventListener('click', (e) => {
+      // Group buttons under the map: pick one, make a new list, or edit (rename / delete) your groups.
+      const groupsEl = document.getElementById('pubGroups');
+      groupsEl?.addEventListener('click', async (e) => {
         const t = e.target as HTMLElement;
+        const act = (t.closest('[data-ga]') as HTMLElement | null);
+        if (act) {
+          const a = act.dataset.ga!, lid = act.dataset.lid ?? null;
+          if (a === 'new') { gMode = 'new'; gRename = gDelete = null; renderGroups(); return; }
+          if (a === 'edit') { gMode = 'edit'; gRename = gDelete = null; renderGroups(); return; }
+          if (a === 'done' || a === 'cancel') { gMode = a === 'cancel' && gMode === 'edit' ? 'edit' : 'idle'; gRename = gDelete = null; renderGroups(); return; }
+          if (a === 'rename') { gRename = lid; gDelete = null; renderGroups(); return; }
+          if (a === 'delete') { gDelete = lid; gRename = null; renderGroups(); return; }
+          if (a === 'delete-yes' && lid && !lpBusy) {
+            lpBusy = true;
+            const { error } = await getSupabase().from('lists').delete().eq('id', lid);
+            lpBusy = false;
+            if (error) return;
+            LISTS.splice(LISTS.findIndex((x) => x.id === lid), 1);
+            gDelete = null; if (!LISTS.length) gMode = 'idle';
+            const url = new URL(window.location.href); url.searchParams.delete('list'); window.history.replaceState(null, '', url);
+            openMine(CUR === lid ? 'all' : CUR ?? 'all'); changed();
+          }
+          return;
+        }
         const g = t.closest('[data-g]') as HTMLElement | null;
-        const nw = t.closest('[data-new]');
         if (g) {
           const key = g.dataset.g!;
           const url = new URL(window.location.href); url.searchParams.delete('focus');
           if (key === 'all') url.searchParams.delete('list'); else url.searchParams.set('list', key);
           window.history.replaceState(null, '', url);
           openMine(key);
-        } else if (nw) { lpMode = 'new'; renderListPanel(); }
-      });
-      document.getElementById('pubListEdit')?.addEventListener('click', async (e) => {
-        const t = (e.target as HTMLElement).closest('[data-lp]') as HTMLElement | null;
-        if (!t || lpBusy) return;
-        const a = t.dataset.lp;
-        if (a === 'rename' || a === 'new' || a === 'delete') { lpMode = a; renderListPanel(); return; }
-        if (a === 'cancel') { lpMode = 'idle'; renderListPanel(); return; }
-        if (a === 'delete-yes' && isList(CUR)) {
-          lpBusy = true;
-          const id = CUR!;
-          const { error } = await getSupabase().from('lists').delete().eq('id', id);
-          lpBusy = false;
-          if (error) return;
-          LISTS.splice(LISTS.findIndex((x) => x.id === id), 1);
-          const url = new URL(window.location.href); url.searchParams.delete('list'); window.history.replaceState(null, '', url);
-          openMine(defaultKey()); changed();
         }
       });
-      document.getElementById('pubListEdit')?.addEventListener('submit', async (e) => {
+      groupsEl?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const name = ((form.elements.namedItem('n') as HTMLInputElement).value || '').trim().slice(0, 60);
         if (!name || lpBusy || !mineUser) return;
         lpBusy = true;
         const sb = getSupabase();
-        if (form.dataset.lpForm === 'rename' && isList(CUR)) {
-          const l = LISTS.find((x) => x.id === CUR)!;
-          const { error } = await sb.from('lists').update({ name }).eq('id', CUR!);
+        if (form.dataset.gform === 'rename' && form.dataset.lid) {
+          const l = LISTS.find((x) => x.id === form.dataset.lid);
+          const { error } = await sb.from('lists').update({ name }).eq('id', form.dataset.lid);
           lpBusy = false;
-          if (error) return;
-          l.name = name; openMine(CUR!); changed();
+          if (error || !l) return;
+          l.name = name; gRename = null; openMine(CUR ?? 'all'); changed();
         } else {
           const { data: row, error } = await sb.from('lists').insert({ user_id: mineUser, name }).select('id, name').single();
           lpBusy = false;
           if (error || !row) return;
           LISTS.push({ id: row.id as string, name: row.name as string, ids: new Set() });
+          gMode = 'idle';
           const url = new URL(window.location.href); url.searchParams.set('list', row.id as string); window.history.replaceState(null, '', url);
           openMine(row.id as string); changed();
         }
@@ -593,6 +571,8 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       // Save a video to the signed-in fan's My Videos (sends signed-out visitors to sign in first).
       async function toggleSave(dbId: string, btn: HTMLElement) {
         if (!userId) { window.location.href = `/login?next=${encodeURIComponent(`/?focus=${dbId}`)}`; return; }
+        // Every saved spot needs a group, so saving opens the group picker instead of saving straight away.
+        if (!savedSet.has(dbId)) { listsOpenFor = dbId; listNew = false; renderListPicker(dbId); return; }
         const was = savedSet.has(dbId);
         if (was) savedSet.delete(dbId); else savedSet.add(dbId);
         const paint = () => {
@@ -617,7 +597,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
             if (mine) SAVED_IDS.delete(dbId);
           } else if (mine) SAVED_IDS.add(dbId);
           if (listsOpenFor === dbId) renderListPicker(dbId);
-          if (mine) { renderGroups(); renderListPanel(); }
+          if (mine) renderGroups();
           window.dispatchEvent(new CustomEvent('povgo:lists-changed'));
         }
       }
@@ -641,7 +621,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         }).join('');
         const form = listNew || !LISTS.length
           ? `<form class="rl-form" data-id="${esc(dbId)}"><input name="n" placeholder="Date night" maxlength="60" aria-label="New group name" autocomplete="off"><button class="lchip on" type="submit">Create</button></form>` : '';
-        el.innerHTML = `<div class="rl-h">${LISTS.length ? 'Add to a group' : 'Make your first group'}</div>
+        el.innerHTML = `<div class="rl-h">${!savedSet.has(dbId) ? (LISTS.length ? 'Pick a group to save this spot' : 'Make a group to save this spot') : LISTS.length ? 'Add to a group' : 'Make your first group'}</div>
           <div class="rl-chips">${chips}${listNew || !LISTS.length ? '' : '<button type="button" class="lchip new" data-act="newlist">+ New group</button>'}</div>${form}`;
         if (listNew) (el.querySelector('input') as HTMLInputElement | null)?.focus();
       }
@@ -669,7 +649,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           if (ok) l.ids.add(dbId);
         } else ok = false;
         listBusy = false;
-        if (ok) { if (mine) { renderGroups(); renderListPanel(); } changed(); }
+        if (ok) { if (mine) renderGroups(); changed(); }
         renderListPicker(dbId);
       }
       async function createListFor(dbId: string, name: string) {
@@ -754,6 +734,9 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
             el.appendChild(sec);
           });
         } else PUBSET.forEach((p, i) => el.appendChild(mkCard(p, i, CUR)));
+        if (mine && !PUBSET.length) {
+          el.innerHTML = `<p class="lp-hint">${LISTS.length ? 'Nothing here yet. Tap Save on a video and pick this group.' : 'Make a group with + New list, then tap Save on any video and pick it.'}</p>`;
+        }
       }
 
       // Group photo blocks under the creator's map, above the search: All + each public group.
@@ -831,7 +814,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (focusPlace && start && focusPlace.creator !== start && !embedded) start = null;
       if (mine) {
         const wantList = params.get('list');
-        openMine(wantList && (wantList === 'all' || wantList === 'follow' || wantList === 'saved' || isList(wantList)) ? wantList : defaultKey());
+        openMine(wantList && (wantList === 'all' || isList(wantList)) ? wantList : defaultKey());
       } else openPub(start);
       if (embedded && CUR) loadGroups(CUR);
       if (!mine && focusPlace && PUBSET.includes(focusPlace)) setTimeout(() => selectPub(PUBSET.indexOf(focusPlace), focusId!), 150);
@@ -896,7 +879,6 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
               <aside className="pubright" id="pubRight" />
             </div>
             {mine && <section className="gpick" id="pubGroups" aria-label="Groups" />}
-            {mine && <section className="lpanel" id="pubListEdit" aria-label="Current list" />}
             <section className="publist" id="pubLeft" aria-label="Places">
               <div className="srch"><input id="pubSearch" type="search" placeholder="Search places…" autoComplete="off" /></div>
               <div className="pubchips-wrapper">

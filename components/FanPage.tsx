@@ -49,6 +49,8 @@ export default function FanPage() {
   const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
   const [finding, setFinding] = useState(false);
   const [notice, setNotice] = useState('');
+  const [pickFor, setPickFor] = useState<FanVideo | null>(null); // saving needs a group: the video waiting for one
+  const [pickNew, setPickNew] = useState('');
   const [discover, setDiscover] = useState<FanVideo[] | null>(null);
   const [dtypes, setDtypes] = useState<string[]>([]); // chosen discover types; empty = All
 
@@ -165,9 +167,26 @@ export default function FanPage() {
   const followIds = useMemo(() => new Set(follows.map((f) => f.id)), [follows]);
   const flash = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(''), 2500); };
 
+  /** Every saved spot needs a group: saving saves the video and puts it in the chosen (or newly made) group. */
+  async function saveToGroup(v: FanVideo, listId: string | null, newName?: string) {
+    if (!uid) return;
+    let id = listId;
+    if (!id) { id = await createList(newName ?? ''); if (!id) return; }
+    const supabase = getSupabase();
+    if (!savedIds.has(v.id)) {
+      const { error } = await supabase.from('saved_videos').insert({ user_id: uid, video_id: v.id });
+      if (error) { flash('Couldn’t save that. Try again.'); return; }
+      setSaved((xs) => [{ savedAt: new Date().toISOString(), video: v }, ...xs]);
+    }
+    await toggleListItem(id, v.id);
+    setPickFor(null); setPickNew('');
+    flash('Saved');
+  }
+
   async function toggleSave(v: FanVideo) {
     if (!uid) return;
     const supabase = getSupabase();
+    if (!savedIds.has(v.id)) { setPickFor(v); return; }
     if (savedIds.has(v.id)) {
       setSaved((xs) => xs.filter((x) => x.video.id !== v.id));
       setLists((ls) => ls.map((l) => ({ ...l, videoIds: l.videoIds.filter((id) => id !== v.id) })));
@@ -423,6 +442,30 @@ export default function FanPage() {
       </main>
 
       <BottomNav active={view} onSelect={(v) => go(v)} />
+
+      {pickFor && (
+        <div className="fixed inset-0 z-[1300] flex items-end sm:items-center justify-center bg-ink/50 p-3" onClick={() => setPickFor(null)}>
+          <div role="dialog" aria-modal="true" aria-label="Pick a group to save to" onClick={(e) => e.stopPropagation()}
+            className="card w-full max-w-sm p-4 bg-white rounded-2xl">
+            <h2 className="text-lg font-semibold text-ink">{lists.length ? 'Pick a group to save it' : 'Make a group to save it'}</h2>
+            <p className="text-xs font-bold text-gray-500 mt-0.5 truncate">{pickFor.place_name || 'This spot'}</p>
+            {lists.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {lists.map((l) => (
+                  <button key={l.id} type="button" onClick={() => saveToGroup(pickFor, l.id)}
+                    className="px-3.5 py-2 rounded-full text-sm font-extrabold bg-cloud text-ink hover:bg-frost">{l.name}</button>
+                ))}
+              </div>
+            )}
+            <form className="flex gap-2 mt-3" onSubmit={(e) => { e.preventDefault(); if (pickNew.trim()) saveToGroup(pickFor, null, pickNew); }}>
+              <input value={pickNew} onChange={(e) => setPickNew(e.target.value)} maxLength={60} placeholder="New group, e.g. Date night" aria-label="New group name"
+                className="min-w-0 flex-1 rounded-full border-2 border-gray-200 px-4 py-2 text-base outline-none focus:border-ice" />
+              <button type="submit" disabled={!pickNew.trim()} className="btn-sun px-4 py-2 text-sm disabled:opacity-50">Create</button>
+            </form>
+            <button type="button" onClick={() => { setPickFor(null); setPickNew(''); }} className="btn-ghost w-full py-2 text-sm mt-3">Cancel</button>
+          </div>
+        </div>
+      )}
 
       {notice && (
         <div role="status" className="pointer-events-none fixed left-1/2 -translate-x-1/2 bottom-24 z-[1200] bg-ink text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg">{notice}</div>
