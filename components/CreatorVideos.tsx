@@ -10,9 +10,8 @@ type Group = { id: string; name: string; ids: string[] };
 const LIMIT = 12;
 
 /**
- * Under the creator's map and list: the creator's public groups as photo buttons, then up to 12 videos from the
- * chosen group in a 3-wide grid that scrolls (same look as Explore videos). Picking a group also narrows the map
- * and the place list above (FanMap listens for `povgo:group`). Tapping a video opens it in that map.
+ * Under the creator's map and list: up to 12 videos from the group chosen in the group blocks (under the map, above
+ * the search) in a 3-wide grid that scrolls, same look as Explore videos. Tapping a video opens it in that map.
  */
 export default function CreatorVideos({ creator }: { creator: Creator }) {
   const [videos, setVideos] = useState<PublicVideo[] | null>(null);
@@ -45,12 +44,13 @@ export default function CreatorVideos({ creator }: { creator: Creator }) {
   const group = groups.find((g) => g.id === sel) ?? null;
   const inGroup = useMemo(() => (videos ?? []).filter((v) => !group || group.ids.includes(v.id)), [videos, group]);
   const shown = inGroup.slice(0, LIMIT);
-  const covers = (list: PublicVideo[]) => list.filter((v) => v.cover_url).slice(0, 4).map((v) => v.cover_url as string);
 
-  function pick(id: string) {
-    setSel(id);
-    window.dispatchEvent(new CustomEvent('povgo:group', { detail: { id: id === 'all' ? null : id } }));
-  }
+  // The group blocks live under the map (FanMap) and announce the choice; the grid follows it.
+  useEffect(() => {
+    const on = (e: Event) => setSel(((e as CustomEvent<{ id: string | null }>).detail?.id) ?? 'all');
+    window.addEventListener('povgo:group', on);
+    return () => window.removeEventListener('povgo:group', on);
+  }, []);
 
   // Tapping a video opens it in the creator's map above instead of leaving the page.
   function onGridClick(e: React.MouseEvent) {
@@ -66,37 +66,9 @@ export default function CreatorVideos({ creator }: { creator: Creator }) {
 
   if (videos !== null && videos.length === 0) return null;
   const name = creator.display_name || creator.tiktok_username;
-  const tiles: { id: string; label: string; list: PublicVideo[] }[] = [
-    { id: 'all', label: 'All', list: videos ?? [] },
-    ...groups.map((g) => ({ id: g.id, label: g.name, list: (videos ?? []).filter((v) => g.ids.includes(v.id)) })),
-  ];
-
   return (
     <section className="mt-10" aria-labelledby="creator-videos">
       <h2 id="creator-videos" className="text-xl sm:text-2xl font-semibold mb-3">{name}&apos;s videos</h2>
-
-      {groups.length > 0 && (
-        <div role="group" aria-label="Groups" className="flex gap-2.5 overflow-x-auto pb-3 mb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-          {tiles.map((t) => {
-            const pics = covers(t.list);
-            const on = sel === t.id;
-            return (
-              <button key={t.id} type="button" onClick={() => pick(t.id)} aria-pressed={on}
-                className={`shrink-0 w-[104px] sm:w-[128px] overflow-hidden rounded-2xl bg-white text-left pb-2 ring-2 ring-inset ${on ? 'ring-ink bg-sun-soft' : 'ring-gray-200 hover:ring-ice'}`}>
-                <span className={`grid h-[62px] sm:h-[72px] overflow-hidden bg-frost ${pics.length > 1 ? 'grid-cols-2 grid-rows-2' : ''}`}>
-                  {pics.map((src, i) => (
-                    <img key={src} src={src} alt="" referrerPolicy="no-referrer" loading="lazy"
-                      onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
-                      className={`h-full w-full object-cover ${pics.length === 2 ? 'row-span-2' : pics.length === 3 && i === 0 ? 'row-span-2' : ''}`} />
-                  ))}
-                </span>
-                <span className="block truncate px-2.5 pt-1.5 font-display text-sm font-semibold leading-tight">{t.label}</span>
-                <span className="block px-2.5 text-[11px] font-extrabold text-gray-500">{t.list.length} video{t.list.length === 1 ? '' : 's'}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       {videos === null ? (
         <div className="grid grid-cols-3 gap-2 sm:gap-4">

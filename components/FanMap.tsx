@@ -196,6 +196,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       let GROUPS: Group[] = [];
       const groupIdx = new Set<number>(); // PUBSET indexes in the chosen group; empty = all spots
       let groupOn = false;
+      let groupSel = 'all';
       const metaCollapsedState: Record<string, boolean> = {};
       let lastMetaCollapsed = false;
       let allCreatorVids: Vid[] = [], allCreatorLocations: Place[] = [], pubVidP: Place | null = null;
@@ -755,8 +756,24 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         } else PUBSET.forEach((p, i) => el.appendChild(mkCard(p, i, CUR)));
       }
 
+      // Group photo blocks under the creator's map, above the search: All + each public group.
+      function renderCreatorGroups() {
+        const el = document.getElementById('pubGroups'); if (!el || !embedded) return;
+        if (!GROUPS.length) { el.hidden = true; $('pub').classList.remove('hasg'); return; }
+        const inG = (g: Group | null) => PUBSET.filter((p) => !g || p.videos.some((v) => g.ids.includes(v.dbId)));
+        const tile = (id: string, name: string, color: string, ps: Place[]) =>
+          `<button type="button" class="gtile${groupSel === id ? ' on' : ''}" data-cg="${esc(id)}" style="--gc:${color}" aria-pressed="${groupSel === id}">
+            ${collage(coversOf(ps))}<span class="gnm">${esc(name)}</span><span class="gct">${spotWord(ps.length)}</span></button>`;
+        el.innerHTML = tile('all', 'All', INK, inG(null)) + GROUPS.map((g, i) => tile(g.id, g.name, LIST_COLORS[i % LIST_COLORS.length], inG(g))).join('');
+        el.hidden = false; $('pub').classList.add('hasg');
+      }
+      document.getElementById('pubGroups')?.addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest('[data-cg]') as HTMLElement | null;
+        if (b) window.dispatchEvent(new CustomEvent('povgo:group', { detail: { id: b.dataset.cg === 'all' ? null : b.dataset.cg } }));
+      });
       function setGroup(id: string) {
         const g = GROUPS.find((x) => x.id === id) ?? null;
+        groupSel = g ? g.id : 'all'; renderCreatorGroups();
         groupOn = Boolean(g); groupIdx.clear();
         if (g) PUBSET.forEach((p, i) => { if (p.videos.some((v) => g.ids.includes(v.dbId))) groupIdx.add(i); });
         applyPubFilter(true);
@@ -771,6 +788,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         GROUPS = ((data ?? []) as unknown as { id: string; name: string; creator_group_items: { video_id: string }[] }[])
           .map((g) => ({ id: g.id, name: g.name, ids: (g.creator_group_items ?? []).map((x) => x.video_id).filter((id) => onMap.has(id)) }))
           .filter((g) => g.ids.length > 0);
+        renderCreatorGroups();
       }
 
       function applyPubFilter(fit?: boolean) {
@@ -827,7 +845,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         if (play) startPlayer();
       };
       window.addEventListener('povgo:focus', onFocus);
-      // The group buttons under the creator's map (CreatorVideos) narrow this map and list.
+      // The group blocks under the creator's map (and the video grid below the page) narrow this map and list.
       onGroup = (e: Event) => setGroup(((e as CustomEvent<{ id: string | null }>).detail?.id) ?? '');
       window.addEventListener('povgo:group', onGroup);
 
@@ -915,6 +933,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         <div className="pubmain">
           <aside className="publeft" id="pubLeft">
             <div className="sheethandle" id="sheetHandle" />
+            <section className="gpick" id="pubGroups" aria-label="Groups" hidden />
             <div className="srch">
               <input id="pubSearch" placeholder="Search places…" autoComplete="off" />
               <button className="srch-toggle" id="srchToggle">▼</button>

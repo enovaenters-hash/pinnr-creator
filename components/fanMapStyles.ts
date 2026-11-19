@@ -151,6 +151,29 @@ export const FAN_CSS = `
   .gsel[hidden]{display:none}
   .gsel.on{background:var(--ink);color:#fff}
 
+  #pub.embed .gpick{display:flex;gap:10px;margin:14px 0 0;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  #pub.embed .gtile{flex:0 0 auto;width:100px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:stretch;text-align:left;font-family:inherit;color:var(--ink);background:#fff;border:0;border-radius:18px;padding:0 0 9px;cursor:pointer;overflow:hidden;box-shadow:inset 0 0 0 2px var(--line),0 4px 14px rgba(19,41,58,.06);border-top:5px solid var(--gc,var(--line))}
+  #pub.embed .gtile:hover{box-shadow:inset 0 0 0 2px var(--gc,var(--line)),0 4px 14px rgba(19,41,58,.1)}
+  #pub.embed .gtile.on{box-shadow:inset 0 0 0 3px var(--gc,var(--ink)),0 6px 18px rgba(19,41,58,.14);background:#fffbe8}
+  #pub.embed .gtile:focus-visible{outline:3px solid var(--bar);outline-offset:2px}
+  #pub.embed .gtile .gnm{font-family:var(--display);font-weight:600;font-size:14px;line-height:1.2;padding:7px 10px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #pub.embed .gtile .gct{font-size:11px;font-weight:800;color:var(--muted);padding:1px 10px 0}
+  #pub.embed .gtile.new{border-top-color:transparent;background:transparent;box-shadow:inset 0 0 0 2px var(--line);border-style:dashed;justify-content:center;align-items:center;min-height:120px;border-top:0;box-shadow:none;border:2px dashed var(--line);padding:0}
+  #pub.embed .gtile.new .gnm{padding:2px 0 0;text-align:center}
+  #pub.embed .gtile.new .gplus{font-size:30px;font-weight:700;line-height:1;color:var(--glacier,#1c7fb0)}
+  #pub.embed .gph{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;height:66px;background:var(--frost,#dff4fc);overflow:hidden;color:var(--bar)}
+  #pub.embed .gph img{width:100%;height:100%;object-fit:cover;display:block;min-width:0;min-height:0}
+  #pub.embed .gph.n1 img{grid-column:1/3;grid-row:1/3}
+  #pub.embed .gph.n2 img{grid-row:1/3}
+  #pub.embed .gph.n3 img:first-child{grid-row:1/3}
+  #pub.embed .gph.n0{display:grid;place-items:center}
+  #pub.embed .gph.n0 svg{width:30px;height:30px}
+  #pub.embed .gpick{margin:0;padding:8px 10px 6px;scroll-padding:0 10px;gap:8px;border-bottom:2px solid var(--line)}
+  #pub.embed .gpick[hidden]{display:none}
+  #pub.embed .gtile{width:92px}
+  #pub.embed .gph{height:48px}
+  @media(max-width:760px){#pub.embed.hasg{height:min(86vh,800px)}#pub.embed .gpick{order:0}}
+
   /* ───── Creator page on phones: map fills the card; one-place list strip + slim search row below (no pop-up sheet) ───── */
   @media(max-width:760px){
     #pub.embed .pubmain{display:flex;flex-direction:column}
