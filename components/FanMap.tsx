@@ -870,7 +870,6 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         {!home && !mine && <SiteNav active="home" />}
         <div id="pub" className={home ? 'page home' : mine ? 'page mine' : 'page'}>
           <div className="pagewrap">
-            {mine && <section className="gpick" id="pubGroups" aria-label="Groups" />}
             <div className="pubbar">
               <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
               <div className="pubwho"><div className="nm" id="pubName">{mine ? 'All saved' : 'All Spots'}</div><div className="h" id="pubHandle">Loading…</div></div>
@@ -881,6 +880,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
               <div id="pubmap"><div className="pubload" id="pubLoading">Loading map…</div></div>
               <aside className="pubright" id="pubRight" />
             </div>
+            {mine && <section className="gpick" id="pubGroups" aria-label="Groups" />}
             {mine && <section className="lpanel" id="pubListEdit" aria-label="Current list" />}
             <section className="publist" id="pubLeft" aria-label="Places">
               <div className="srch"><input id="pubSearch" type="search" placeholder="Search places…" autoComplete="off" /></div>
