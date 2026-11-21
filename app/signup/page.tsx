@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { AuthCard, Switch, inputClass, primaryBtn } from '@/components/AuthCard';
+import EmailCode from '@/components/EmailCode';
 
 /**
  * One sign-up for everyone. "I'm a creator" is a switch that reveals the TikTok username field
@@ -67,9 +68,8 @@ export default function SignupPage() {
       footer={<>Already have an account? <Link href="/login" className="text-blue-600 font-medium">Sign in</Link></>}
     >
       {checkEmail ? (
-        <p className="text-sm text-gray-700">
-          Check <strong>{email}</strong> for a confirmation link, then come back and sign in.
-        </p>
+        <EmailCode email={email} onBack={() => setCheckEmail(false)}
+          onVerified={() => router.replace(creator ? '/fan?view=myspots' : '/fan')} />
       ) : (
         <form onSubmit={onSubmit} className="space-y-3">
           <label className="block">
