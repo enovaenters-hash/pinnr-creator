@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { AuthCard, inputClass, primaryBtn } from '@/components/AuthCard';
+import EmailCode from '@/components/EmailCode';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,16 +13,30 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [needCode, setNeedCode] = useState(false); // signed up but never confirmed: finish with the emailed code
+
+  function done() {
+    const next = new URLSearchParams(window.location.search).get('next');
+    router.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/fan');
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setBusy(true);
-    const { error } = await getSupabase().auth.signInWithPassword({ email, password });
+    const supabase = getSupabase();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error && /not confirmed/i.test(error.message)) {
+      // Never finished confirming: send a fresh code and let them type it here.
+      const sent = await supabase.auth.resend({ type: 'signup', email });
+      setBusy(false);
+      if (sent.error) { setError(sent.error.message); return; }
+      setNeedCode(true);
+      return;
+    }
     setBusy(false);
     if (error) { setError(error.message); return; }
-    const next = new URLSearchParams(window.location.search).get('next');
-    router.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/fan');
+    done();
   }
 
   return (
@@ -30,6 +45,9 @@ export default function LoginPage() {
       subtitle="Sign in to your POVGo account."
       footer={<>New here? <Link href="/signup" className="text-blue-600 font-medium">Join POVGo</Link></>}
     >
+      {needCode ? (
+        <EmailCode email={email} onBack={() => setNeedCode(false)} onVerified={done} />
+      ) : (
       <form onSubmit={onSubmit} className="space-y-3">
         <label className="block">
           <span className="text-xs font-medium text-gray-600">Email</span>
@@ -44,6 +62,7 @@ export default function LoginPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button className={primaryBtn} disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
+      )}
     </AuthCard>
   );
 }
