@@ -7,10 +7,12 @@ import { primaryBtn } from '@/components/AuthCard';
 const LEN = 6; // Supabase's default email code length (Authentication → Emails). Keep it at 6.
 
 /**
- * "Enter the code we sent you": after sign-up the confirmation email carries a 6-digit code ({{ .Token }}),
+ * "Enter the code we sent you" (kind = 'signup' to confirm a new account, 'recovery' to reset a forgotten password): after sign-up the confirmation email carries a 6-digit code ({{ .Token }}),
  * so people type it here and are signed in without leaving the app or opening a link in another browser.
  */
-export default function EmailCode({ email, onVerified, onBack }: { email: string; onVerified: () => void; onBack: () => void }) {
+export default function EmailCode({ email, onVerified, onBack, kind = 'signup' }: {
+  email: string; onVerified: () => void; onBack: () => void; kind?: 'signup' | 'recovery';
+}) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -28,7 +30,7 @@ export default function EmailCode({ email, onVerified, onBack }: { email: string
   async function verify(token: string) {
     if (busy || token.length !== LEN) return;
     setBusy(true); setError(''); setNote('');
-    const { error: err } = await getSupabase().auth.verifyOtp({ email, token, type: 'signup' });
+    const { error: err } = await getSupabase().auth.verifyOtp({ email, token, type: kind });
     setBusy(false);
     if (err) {
       setError(/expired|invalid/i.test(err.message) ? 'That code didn’t work. Check it or ask for a new one.' : err.message);
@@ -47,7 +49,10 @@ export default function EmailCode({ email, onVerified, onBack }: { email: string
   async function resend() {
     if (wait > 0) return;
     setError(''); setNote('');
-    const { error: err } = await getSupabase().auth.resend({ type: 'signup', email });
+    const sb = getSupabase();
+    const { error: err } = kind === 'recovery'
+      ? await sb.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset` })
+      : await sb.auth.resend({ type: 'signup', email });
     if (err) { setError(err.message); return; }
     setNote('New code sent.'); setWait(30); setCode(''); input.current?.focus();
   }
