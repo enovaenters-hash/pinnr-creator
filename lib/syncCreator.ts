@@ -128,10 +128,26 @@ export async function syncCreator(
     .eq('creator_id', creator.id).is('lat', null).not('address', 'is', null).eq('geocode_attempted', false)
     .order('posted_at', { ascending: false });
 
+  // Several videos often share one address (a second video about the same restaurant): geocode each
+  // address once, reusing pins this creator already has and pins found earlier in this run.
+  const addrKey = (a: string) => a.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const known = new Map<string, { lat: number; lng: number }>();
+  if ((pending?.length ?? 0) > 0) {
+    const { data: placed } = await supabase
+      .from('videos').select('address, lat, lng').eq('creator_id', creator.id).not('lat', 'is', null).not('address', 'is', null);
+    for (const r of placed ?? []) known.set(addrKey(r.address as string), { lat: r.lat as number, lng: r.lng as number });
+  }
+
   let lookups = 0;
   let mapped = 0;
   let processed = 0;
   for (const v of pending ?? []) {
+    const reuse = known.get(addrKey(v.address!));
+    if (reuse) {
+      await supabase.from('videos').update({ lat: reuse.lat, lng: reuse.lng, geocode_attempted: true }).eq('id', v.id);
+      processed++; mapped++;
+      continue;
+    }
     if (lookups >= maxLookups) break;
     let hit: GeoResult | null = null;
     let triedAll = true;
@@ -147,7 +163,7 @@ export async function syncCreator(
       lat: hit?.lat ?? null, lng: hit?.lng ?? null, geocode_attempted: true,
     }).eq('id', v.id);
     processed++;
-    if (hit) mapped++;
+    if (hit) { mapped++; known.set(addrKey(v.address!), { lat: hit.lat, lng: hit.lng }); }
   }
 
   // Keep the profile fresh: TikTok avatar links expire, and swap the default name for their TikTok nickname.
