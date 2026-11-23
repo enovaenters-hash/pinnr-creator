@@ -65,13 +65,21 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
     setSyncing(true);
     setStatus({ text: 'Checking TikTok for new videos…', tone: 'info' });
     try {
-      const r = await api('/api/sync', { method: 'POST' });
+      // Placing addresses on the map is slow (about one a second), so one press does up to ~35 and,
+      // if some are still waiting, keeps going for a couple more rounds instead of making you press again.
+      let r = await api('/api/sync', { method: 'POST' });
+      const total = { added: r.added as number, checked: r.checked as number, tagged: r.tagged as number, mapped: r.mapped as number };
+      for (let round = 1; round < 3 && r.pending > 0 && r.mapped + r.tagged > 0; round++) {
+        setStatus({ text: `Placing ${r.pending} more spot${r.pending === 1 ? '' : 's'} on the map…`, tone: 'info' });
+        r = await api('/api/sync', { method: 'POST' });
+        total.mapped += r.mapped; total.tagged += r.tagged; total.added += r.added;
+      }
       setStatus({
         text: [
-          r.added ? `Added ${r.added} new video${r.added === 1 ? '' : 's'}` : `No new videos (checked ${r.checked})`,
-          r.tagged ? `${r.tagged} placed from your TikTok location tags` : null,
-          r.mapped ? `${r.mapped} placed on the map` : null,
-          r.pending ? `${r.pending} more will be placed on your next sync` : null,
+          total.added ? `Added ${total.added} new video${total.added === 1 ? '' : 's'}` : `No new videos (checked ${total.checked})`,
+          total.tagged ? `${total.tagged} placed from your TikTok location tags` : null,
+          total.mapped ? `${total.mapped} placed on the map` : null,
+          r.pending ? `${r.pending} still need a place (tap Edit to fix the address, or Sync again)` : null,
         ].filter(Boolean).join(' · '),
         tone: 'ok',
       });
