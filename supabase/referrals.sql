@@ -3,18 +3,18 @@
 --
 -- After this runs, EVERY new signup (fan or creator) must enter a valid referral code.
 -- Codes belong to creators (up to 3 each, made on My Spots). Existing accounts are not affected.
--- To start the chain, make your own code on My Spots from an account that already exists.
--- Emergency / launch codes not tied to a person can be added with:
---   insert into public.referral_codes (creator_id, code) values ('<an existing creator id>', 'LAUNCH');
+-- The house code POVGO (owned by no creator) is created below, so the very first people can join.
+-- More house codes: insert into public.referral_codes (creator_id, code) values (null, 'LAUNCH');
 
 -- ─── Codes: up to 3 per creator, letters and numbers only, unique (stored UPPERCASE) ────────────
 create table if not exists public.referral_codes (
   id          uuid primary key default gen_random_uuid(),
-  creator_id  uuid not null references public.creators(id) on delete cascade,
+  creator_id  uuid references public.creators(id) on delete cascade, -- null = house code (admin side)
   code        text not null,
   created_at  timestamptz not null default now(),
   constraint referral_code_format check (code ~ '^[A-Z0-9]{3,20}$')
 );
+alter table public.referral_codes alter column creator_id drop not null;
 create unique index if not exists referral_codes_code_key on public.referral_codes (code);
 create index if not exists referral_codes_creator_idx on public.referral_codes (creator_id);
 
@@ -39,6 +39,10 @@ drop policy if exists "referral codes insert own" on public.referral_codes;
 create policy "referral codes insert own" on public.referral_codes for insert with check (auth.uid() = creator_id);
 drop policy if exists "referral codes delete own" on public.referral_codes;
 create policy "referral codes delete own" on public.referral_codes for delete using (auth.uid() = creator_id);
+
+-- The original code for the admin side. Not tied to any creator, so it works from day one.
+insert into public.referral_codes (creator_id, code) values (null, 'POVGO')
+on conflict (code) do nothing;
 
 -- ─── Who signed up with which code (no policies: only the functions below can read it) ──────────
 create table if not exists public.referral_signups (
@@ -93,6 +97,7 @@ $$;
 grant execute on function public.check_referral_code(text) to anon, authenticated;
 
 -- Creator dashboard: signups per code for the last 1, 7 and 30 days, and in total.
+-- Admins also get a row for each house code (like POVGO).
 -- A row with code = null covers signups from codes that were since removed.
 create or replace function public.referral_stats()
 returns table (code text, total bigint, d1 bigint, d7 bigint, d30 bigint)
@@ -105,7 +110,17 @@ language sql stable security definer set search_path = public as $$
     from public.referral_codes c
     left join public.referral_signups s on s.code = c.code and s.creator_id = c.creator_id
    where c.creator_id = auth.uid()
-   group by c.code, c.created_at
+   group by c.code
+  union all
+  select c.code,
+         count(s.user_id),
+         count(s.user_id) filter (where s.created_at >= now() - interval '1 day'),
+         count(s.user_id) filter (where s.created_at >= now() - interval '7 days'),
+         count(s.user_id) filter (where s.created_at >= now() - interval '30 days')
+    from public.referral_codes c
+    left join public.referral_signups s on s.code = c.code and s.creator_id is null
+   where c.creator_id is null and public.is_admin()
+   group by c.code
   union all
   select null::text,
          count(*),
