@@ -16,7 +16,7 @@ const FanMap = dynamic(() => import('@/components/FanMap'), { ssr: false });
 const PHOENIX = { center: [33.4484, -112.074] as [number, number], zoom: 10 };
 
 type NewCreator = Creator & { spots: number };
-type Stats = { creators: number | null; fans: number | null; locations: number | null };
+type Stats = { creators: number | null; locations: number | null; videos: number | null };
 
 const VIDEO_FIELDS = '*, creators(tiktok_username, display_name, avatar_url)';
 // The map + Explore grid also need each creator's content types. content_types only exists once multi-types.sql
@@ -33,21 +33,19 @@ export default function Home() {
   const [allCreators, setAllCreators] = useState<Creator[] | null>(null);
   const [showAllCreators, setShowAllCreators] = useState(false);
   const [mapVideos, setMapVideos] = useState<PublicVideo[] | null>(null);
-  const [stats, setStats] = useState<Stats>({ creators: null, fans: null, locations: null });
+  const [stats, setStats] = useState<Stats>({ creators: null, locations: null, videos: null });
 
   useEffect(() => {
     if (!supabaseConfigured) return;
     const supabase = getSupabase();
 
-    // Site totals. Creators and locations can be counted straight away; fans (accounts that aren't
-    // creators) come from the site_stats() function, which also refreshes all three together.
+    // Site totals: creators, locations (videos placed on the map) and videos (all public videos).
     supabase.from('creators').select('id', { count: 'exact', head: true })
       .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, creators: count })); });
     supabase.from('videos').select('id', { count: 'exact', head: true }).eq('hidden', false).not('lat', 'is', null)
       .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, locations: count })); });
-    supabase.rpc('site_stats').then(({ data, error }) => {
-      if (!error && data) setStats({ creators: data.creators ?? null, fans: data.fans ?? null, locations: data.locations ?? null });
-    });
+    supabase.from('videos').select('id', { count: 'exact', head: true }).eq('hidden', false)
+      .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, videos: count })); });
 
     const loadAll = (fields: string) => supabase.from('videos').select(fields).eq('hidden', false).not('lat', 'is', null)
       .order('created_at', { ascending: false }).order('posted_at', { ascending: false }).limit(1000);
@@ -112,8 +110,8 @@ export default function Home() {
             {/* Stats: one strip on phones, stacked rows on desktop */}
             <dl className="card grid grid-cols-3 divide-x-2 divide-gray-100 lg:col-start-2 lg:row-start-1 lg:grid-cols-1 lg:divide-x-0 lg:divide-y-2 self-start">
               <Stat label="Total Creators" value={stats.creators} />
-              <Stat label="Total Fans" value={stats.fans} />
               <Stat label="Total Locations" value={stats.locations} />
+              <Stat label="Total Videos" value={stats.videos} />
             </dl>
 
             {/* Phoenix content map */}
