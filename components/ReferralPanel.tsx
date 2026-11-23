@@ -85,6 +85,8 @@ export default function ReferralPanel({ creatorId }: { creatorId: string }) {
 
   const statFor = (code: string | null) => stats.find((s) => s.code === code);
   const removed = statFor(null);
+  // House codes (like POVGO) only come back for admins; they aren't the creator's own codes.
+  const house = stats.filter((x) => x.code && !codes.some((c) => c.code === x.code));
   const sum = (k: 'd1' | 'd7' | 'd30' | 'total') => stats.reduce((n, s) => n + s[k], 0);
 
   return (
@@ -105,7 +107,7 @@ export default function ReferralPanel({ creatorId }: { creatorId: string }) {
       )}
       {msg && <p className={`text-xs mt-2 ${msg.ok ? 'text-green-700' : 'text-red-600'}`}>{msg.text}</p>}
 
-      {codes.length > 0 && (
+      {(codes.length > 0 || house.length > 0) && (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -136,6 +138,14 @@ export default function ReferralPanel({ creatorId }: { creatorId: string }) {
                   </tr>
                 );
               })}
+              {house.map((h) => (
+                <tr key={h.code} className="border-t border-gray-100 text-right">
+                  <td className="text-left py-2"><span className="font-bold tracking-wide">{h.code}</span>
+                    <span className="block text-xs text-gray-500">House code</span></td>
+                  <td className="px-2 font-semibold">{h.d1}</td><td className="px-2 font-semibold">{h.d7}</td>
+                  <td className="px-2 font-semibold">{h.d30}</td><td className="pl-2 font-semibold">{h.total}</td>
+                </tr>
+              ))}
               {removed && (
                 <tr className="border-t border-gray-100 text-right text-gray-500">
                   <td className="text-left py-2 text-xs">Deleted codes</td>
@@ -154,7 +164,7 @@ export default function ReferralPanel({ creatorId }: { creatorId: string }) {
           </table>
         </div>
       )}
-      {loaded && codes.length === 0 && (
+      {loaded && codes.length === 0 && house.length === 0 && (
         <p className="text-sm text-gray-500 mt-3">You don’t have a code yet. Type one above to get started.</p>
       )}
     </section>
