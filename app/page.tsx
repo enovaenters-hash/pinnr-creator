@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
@@ -29,6 +29,9 @@ export default function Home() {
   const [featured, setFeatured] = useState<PublicVideo[] | null>(null);
   const [newPovs, setNewPovs] = useState<PublicVideo[] | null>(null);
   const [newCreators, setNewCreators] = useState<NewCreator[] | null>(null);
+  /** "See all" on New Creators: every creator, newest first. Loaded the first time it's opened. */
+  const [allCreators, setAllCreators] = useState<Creator[] | null>(null);
+  const [showAllCreators, setShowAllCreators] = useState(false);
   const [mapVideos, setMapVideos] = useState<PublicVideo[] | null>(null);
   const [stats, setStats] = useState<Stats>({ creators: null, fans: null, locations: null });
 
@@ -75,6 +78,24 @@ export default function Home() {
       setNewCreators(withCounts);
     })();
   }, []);
+
+  async function toggleAllCreators() {
+    const next = !showAllCreators;
+    setShowAllCreators(next);
+    if (next && allCreators === null && supabaseConfigured) {
+      const { data } = await getSupabase().from('creators').select('*').order('created_at', { ascending: false }).limit(500);
+      setAllCreators((data as Creator[]) ?? []);
+    }
+  }
+
+  // Spot counts for the full list come from the map videos already loaded, so "See all" costs one query.
+  const creatorList: NewCreator[] | null = useMemo(() => {
+    if (!showAllCreators) return newCreators;
+    if (allCreators === null) return null;
+    const counts = new Map<string, number>();
+    for (const v of mapVideos ?? []) counts.set(v.creator_id, (counts.get(v.creator_id) ?? 0) + 1);
+    return allCreators.map((c) => ({ ...c, spots: counts.get(c.id) ?? 0 }));
+  }, [showAllCreators, newCreators, allCreators, mapVideos]);
 
   return (
     <>
@@ -133,11 +154,17 @@ export default function Home() {
         </section>
 
         <section className="mt-10">
-          <h2 className="text-2xl font-semibold mb-3">New Creators</h2>
-          {newCreators === null && <Skeleton rows />}
-          {newCreators?.length === 0 && <p className="text-sm text-gray-500">No creators yet.</p>}
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-2xl font-semibold">{showAllCreators ? 'All Creators' : 'New Creators'}</h2>
+            <button type="button" onClick={toggleAllCreators} aria-expanded={showAllCreators}
+              className="text-sm font-bold text-glacier hover:underline">
+              {showAllCreators ? 'Show less' : 'See all →'}
+            </button>
+          </div>
+          {creatorList === null && <Skeleton rows />}
+          {creatorList?.length === 0 && <p className="text-sm text-gray-500">No creators yet.</p>}
           <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {newCreators?.map((c) => (
+            {creatorList?.map((c) => (
               <li key={c.id}>
                 <Link href={`/c/${c.tiktok_username}`}
                   className="card flex items-center gap-3 p-3 border-2 border-transparent hover:border-ice transition-colors">
