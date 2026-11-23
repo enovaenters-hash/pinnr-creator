@@ -8,6 +8,7 @@ import { categoryColor, CONTENT_TYPES, creatorTypes, type Creator, type Video } 
 import { api } from '@/lib/api';
 import VideoEditForm from '@/components/VideoEditForm';
 import ConnectedAccounts from '@/components/ConnectedAccounts';
+import ReferralPanel from '@/components/ReferralPanel';
 import { NotConfigured, Switch, inputClass, primaryBtn } from '@/components/AuthCard';
 import SiteNav from '@/components/SiteNav';
 import type { MapPin } from '@/components/Map';
@@ -15,6 +16,7 @@ import type { MapPin } from '@/components/Map';
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
 type Filter = 'all' | 'needs' | 'mapped';
+type Sort = 'new' | 'saved';
 
 /** A creator's own group of videos, shown on their public page. */
 type Group = { id: string; name: string; isPublic: boolean; videoIds: string[] };
@@ -36,18 +38,25 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
   /** False when the creator_groups table isn't set up yet (supabase/creator-groups.sql not run). */
   const [groupsReady, setGroupsReady] = useState(true);
   const [groupsFor, setGroupsFor] = useState<string | null>(null);
+  /** How many fans saved each video (video id -> count). Empty until supabase/referrals.sql has been run. */
+  const [saves, setSaves] = useState<Record<string, number>>({});
+  const [sort, setSort] = useState<Sort>('new');
 
   const load = useCallback(async () => {
     const supabase = getSupabase();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { if (embedded) setLoading(false); else router.replace('/login'); return; }
-    const [{ data: c }, { data: v }, g] = await Promise.all([
+    const [{ data: c }, { data: v }, g, sc] = await Promise.all([
       supabase.from('creators').select('*').eq('id', session.user.id).maybeSingle(),
       supabase.from('videos').select('*').eq('creator_id', session.user.id)
         .order('posted_at', { ascending: false, nullsFirst: false }),
       supabase.from('creator_groups').select('id, name, is_public, creator_group_items(video_id)')
         .eq('creator_id', session.user.id).order('position').order('created_at'),
+      supabase.rpc('video_save_counts'),
     ]);
+    const counts: Record<string, number> = {};
+    for (const r of (sc.data ?? []) as { video_id: string; saves: number | string }[]) counts[r.video_id] = Number(r.saves) || 0;
+    setSaves(counts);
     setCreator(c as Creator | null);
     setVideos((v as Video[]) ?? []);
     setGroupsReady(!g.error);
@@ -186,8 +195,10 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
 
   const mapped = videos.filter((v) => v.lat !== null && v.lng !== null);
   const featuredCount = videos.filter((v) => v.featured).length;
-  const shown = videos.filter((v) =>
+  const filtered = videos.filter((v) =>
     filter === 'all' ? true : filter === 'mapped' ? v.lat !== null : v.lat === null);
+  // Videos arrive newest first; the sort is stable, so ties on "Most saved" stay newest first.
+  const shown = sort === 'saved' ? [...filtered].sort((a, b) => (saves[b.id] ?? 0) - (saves[a.id] ?? 0)) : filtered;
 
   const pins: MapPin[] = useMemo(() => mapped.filter((v) => !v.hidden).map((v) => ({
     id: v.id, lat: v.lat!, lng: v.lng!,
@@ -258,6 +269,9 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
           <Stat label="Top picks" value={`${featuredCount}/3`} />
         </section>
 
+        {/* Referral codes */}
+        <ReferralPanel creatorId={creator.id} />
+
         {/* Map */}
         <section className="mb-8">
           <div className="h-72 rounded-xl overflow-hidden border-2 border-white shadow-[0_6px_20px_rgba(19,41,58,.07)] relative z-0">
@@ -285,6 +299,18 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
               ))}
             </div>
           </div>
+
+          {videos.length > 1 && (
+            <div className="flex items-center gap-1 text-xs mb-3" role="group" aria-label="Sort videos">
+              <span className="text-gray-500 mr-1">Sort</span>
+              {([['new', 'Newest'], ['saved', 'Most saved']] as [Sort, string][]).map(([k, label]) => (
+                <button key={k} onClick={() => setSort(k)} aria-pressed={sort === k}
+                  className={`px-3 py-1 rounded-full border ${sort === k ? 'bg-ink text-white border-ink font-bold' : 'bg-white border-gray-200 text-gray-600 font-semibold'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {videos.length === 0 && (
             <div className="text-center text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg py-10">
@@ -318,6 +344,7 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
                     <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
                       {v.category && <span className="px-2 py-0.5 rounded-full text-white" style={{ background: categoryColor(v.category) }}>#{v.category}</span>}
                       {v.discount_code && <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Code: {v.discount_code}</span>}
+                      <span title="Fans who saved this video" className="px-2 py-0.5 rounded-full bg-frost text-glacier font-bold">♥ {saves[v.id] ?? 0} saved</span>
                       {v.hidden && <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Hidden</span>}
                       {v.posted_at && <span className="text-gray-400">{new Date(v.posted_at).toLocaleDateString()}</span>}
                       {groupsReady && (() => {
