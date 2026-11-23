@@ -173,6 +173,12 @@ export const FAN_CSS = `
   #pub.embed .gph.n3 img:first-child{grid-row:1/3}
   #pub.embed .gph.n0{display:grid;place-items:center}
   #pub.embed .gph.n0 svg{width:30px;height:30px}
+  /* Creator page: category bar 25% smaller (text and bubbles) */
+  #pub.embed .pubchips-wrapper{border-bottom:1px solid var(--line)}
+  #pub.embed .pubchips-bar{padding:7px 0;gap:6px;margin-right:10px}
+  #pub.embed .pchip{font-size:9.4px;padding:5px 10px;border-width:1.5px;gap:4.5px}
+  #pub.embed .pchip .d{width:6px;height:6px}
+  #pub.embed .clear-btn{margin:7px 6px 7px 10px;padding:4px 9px;font-size:9px}
   #pub.embed .gpick{margin:0;padding:8px 10px 6px;scroll-padding:0 10px;gap:8px;border-bottom:2px solid var(--line)}
   #pub.embed .gpick[hidden]{display:none}
   #pub.embed .gtile{width:92px}

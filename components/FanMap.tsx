@@ -910,13 +910,13 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           <a className="pubview" id="pubView" href="/" hidden>View page</a>
           <select className="pubsel" id="pubCreator" aria-label="Choose creator"><option>All creators</option></select>
         </div>
-        <div className="pubchips-wrapper">
-          <button className="pchip clear-btn" id="clearBtn">✕ Clear Search</button>
-          <div className="pubchips-bar" id="pubChips" />
-        </div>
         <div className="pubmain">
           <aside className="publeft" id="pubLeft">
             <div className="sheethandle" id="sheetHandle" />
+            <div className="pubchips-wrapper">
+              <button className="pchip clear-btn" id="clearBtn">✕ Clear Search</button>
+              <div className="pubchips-bar" id="pubChips" />
+            </div>
             <section className="gpick" id="pubGroups" aria-label="Groups" hidden />
             <div className="srch">
               <input id="pubSearch" placeholder="Search places…" autoComplete="off" />

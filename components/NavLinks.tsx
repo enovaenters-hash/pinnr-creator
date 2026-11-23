@@ -6,12 +6,13 @@ import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 
 export type NavActive = 'home' | 'login' | 'admin';
 
-const pill = 'whitespace-nowrap rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2 text-[13px] sm:text-sm font-extrabold text-ink transition-colors';
+const pillBase = 'whitespace-nowrap rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2 text-[13px] sm:text-sm font-extrabold text-ink transition-colors';
 const on = 'bg-white shadow-sm';
 const off = 'opacity-85 hover:bg-white/40 hover:opacity-100';
 
 /** Sign in, or your account menu with Sign out. The main navigation (Explore, Following, My Spots) lives in BottomNav. Shared by the site bar and the fan map bar. */
-export default function NavLinks({ active, className = '' }: { active?: NavActive; className?: string }) {
+export default function NavLinks({ active, className = '', compact = false }: { active?: NavActive; className?: string; compact?: boolean }) {
+  const pill = compact ? pillBase.replace('py-1.5 sm:py-2', 'py-0.5 sm:py-1.5') : pillBase;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   // undefined = checking, null = signed out, string = signed in (the first letter of their name or email)

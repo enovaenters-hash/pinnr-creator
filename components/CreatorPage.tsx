@@ -123,7 +123,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
 
   return (
     <>
-      <SiteNav />
+      <SiteNav compact />
       <main className="flex-1 bg-cloud text-ink">
         <div className="max-w-5xl mx-auto px-4 pb-28">
           {/* Who: photo, then name (shrinks to fit one line) over handle + small buttons */}
@@ -190,11 +190,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
           )}
 
           {/* Their map */}
-          <section id="creator-map" className="mt-8 scroll-mt-4">
-            <h2 className="text-xl sm:text-2xl font-semibold mb-3 flex flex-wrap items-baseline gap-x-2">
-              All of {name}&apos;s spots
-              {spots !== null && <span className="text-sm font-bold text-gray-500 font-sans whitespace-nowrap">{spots} on the map</span>}
-            </h2>
+          <section id="creator-map" aria-label={`${name}'s spots map`} className="mt-3 scroll-mt-4">
             <FanMap initialCreator={handle} embedded />
           </section>
 
