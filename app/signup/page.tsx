@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import { AuthCard, Switch, inputClass, primaryBtn } from '@/components/AuthCard';
+import { AuthCard, PasswordField, Switch, inputClass, primaryBtn } from '@/components/AuthCard';
 import EmailCode from '@/components/EmailCode';
 
 /**
@@ -84,8 +84,7 @@ export default function SignupPage() {
           </label>
           <label className="block">
             <span className="text-xs font-medium text-gray-600">Password</span>
-            <input id="signup-password" className={`${inputClass} mt-1`} type="password" value={password} minLength={6}
-              onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
+            <PasswordField id="signup-password" value={password} onChange={setPassword} autoComplete="new-password" minLength={6} />
           </label>
           <Switch id="signup-creator" on={creator} onChange={setCreator} label="I’m a creator" hint="Your TikTok spots go on the map." />
           {creator && (
