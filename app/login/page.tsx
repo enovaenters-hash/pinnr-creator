@@ -54,7 +54,7 @@ export default function LoginPage() {
     <AuthCard
       title={forgot === 'off' ? 'Welcome back' : forgot === 'newpw' ? 'Choose a new password' : 'Reset your password'}
       subtitle={forgot === 'off' ? 'Sign in to your POVGo account.' : forgot === 'email' ? 'Enter your email and we’ll send you a code to reset it.' : forgot === 'newpw' ? 'Pick something you’ll remember. Tap Show to check it.' : 'Check your email for a code (or tap the link in it).'}
-      footer={<>New here? <Link href="/signup" className="text-blue-600 font-medium">Join POVGo</Link></>}
+      footer={null}
     >
       {forgot === 'email' ? (
         <form onSubmit={sendReset} className="space-y-3">
@@ -86,6 +86,10 @@ export default function LoginPage() {
         <button type="button" onClick={() => { setForgot('email'); setError(''); }} className="block ml-auto text-xs font-bold text-glacier hover:underline">Forgot password?</button>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button className={primaryBtn} disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <div className="flex items-center gap-3 pt-1 text-xs font-bold text-gray-400" aria-hidden="true">
+          <span className="h-px flex-1 bg-gray-200" />New here?<span className="h-px flex-1 bg-gray-200" />
+        </div>
+        <Link href="/signup" className="btn-ghost w-full py-3 text-sm text-center block">Join POVGo</Link>
       </form>
       )}
     </AuthCard>
