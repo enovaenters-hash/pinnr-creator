@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { supabaseConfigured } from '@/lib/supabase';
 import SiteNav from '@/components/SiteNav';
 import SiteFooter from '@/components/SiteFooter';
@@ -50,6 +51,23 @@ export function Switch({ on, onChange, label, hint, id }: { on: boolean; onChang
       <button id={id} type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)}
         className={`relative shrink-0 w-12 h-7 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-frost ${on ? 'bg-ice' : 'bg-gray-300'}`}>
         <span aria-hidden="true" className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+      </button>
+    </div>
+  );
+}
+
+/** A password box with a Show / Hide button so people can check what they typed. */
+export function PasswordField({ value, onChange, autoComplete, id, minLength }: {
+  value: string; onChange: (v: string) => void; autoComplete: 'current-password' | 'new-password'; id?: string; minLength?: number;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative mt-1">
+      <input id={id} className={`${inputClass} pr-16`} type={shown ? 'text' : 'password'} value={value} minLength={minLength}
+        onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} autoCapitalize="none" autoCorrect="off" spellCheck={false} required />
+      <button type="button" onClick={() => setShown((v) => !v)} aria-pressed={shown} aria-label={shown ? 'Hide password' : 'Show password'}
+        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-3 py-1 text-xs font-extrabold text-glacier hover:bg-frost focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-frost">
+        {shown ? 'Hide' : 'Show'}
       </button>
     </div>
   );
