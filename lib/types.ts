@@ -9,6 +9,8 @@ export interface Creator {
   content_types?: string[] | null;
   /** Older single-type column, kept in sync with the first of content_types. */
   content_type?: string | null;
+  /** Set by an admin: the profile, videos and locations are hidden from public view. */
+  hidden?: boolean;
 }
 
 /** Content types a creator can attach to their feed. */
