@@ -39,12 +39,15 @@ export default function Home() {
     if (!supabaseConfigured) return;
     const supabase = getSupabase();
 
-    // Site totals: creators, locations (videos placed on the map) and videos (all public videos).
-    supabase.from('creators').select('id', { count: 'exact', head: true })
+    // Site totals count only what the public can see: creators an admin hasn't hidden, and their visible videos
+    // (even when an admin is signed in, who can otherwise see everything).
+    supabase.from('creators').select('id', { count: 'exact', head: true }).eq('hidden', false)
       .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, creators: count })); });
-    supabase.from('videos').select('id', { count: 'exact', head: true }).eq('hidden', false).not('lat', 'is', null)
+    supabase.from('videos').select('id, creators!inner(hidden)', { count: 'exact', head: true })
+      .eq('hidden', false).eq('creators.hidden', false).not('lat', 'is', null)
       .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, locations: count })); });
-    supabase.from('videos').select('id', { count: 'exact', head: true }).eq('hidden', false)
+    supabase.from('videos').select('id, creators!inner(hidden)', { count: 'exact', head: true })
+      .eq('hidden', false).eq('creators.hidden', false)
       .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, videos: count })); });
 
     const loadAll = (fields: string) => supabase.from('videos').select(fields).eq('hidden', false).not('lat', 'is', null)
