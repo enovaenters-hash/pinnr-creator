@@ -411,7 +411,8 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const chips = $('pubChips'); chips.innerHTML = '';
         const cuisineCounts: Record<string, number> = {};
         PUBSET.forEach((p) => { cuisineCounts[p.cuisine] = (cuisineCounts[p.cuisine] || 0) + 1; });
-        Object.keys(cuisineCounts).sort((a, b) => cuisineCounts[b] - cuisineCounts[a]).forEach((c) => {
+        // Alphabetical by the label you see, with Other first (far left).
+        Object.keys(cuisineCounts).sort((a, b) => (a === 'other' ? -1 : b === 'other' ? 1 : cLabel(a).localeCompare(cLabel(b)))).forEach((c) => {
           const el = document.createElement('div'); el.className = 'pchip';
           el.innerHTML = `<span class="d" style="background:${cColor(c)}"></span>${esc(cLabel(c))}`;
           el.onclick = () => {
