@@ -221,6 +221,11 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
   return (
     <Shell embedded={embedded}>
       <div>
+        {creator.hidden && (
+          <p className={`rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-sm font-semibold px-4 py-3 mb-4 ${embedded ? '' : 'mt-6'}`}>
+            Your profile is hidden from public view right now, so fans can’t see your page, videos or locations. Questions? Contact POVGo.
+          </p>
+        )}
         {/* Header — V16 full-width stack */}
         <header className={`card p-5 mb-6 ${embedded ? '' : 'mt-6'}`}>
           <div className="flex items-center justify-between mb-3">
