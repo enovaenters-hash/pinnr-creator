@@ -79,6 +79,19 @@ export default function AdminPage() {
     }
   }
 
+  /** Hide a creator (profile, videos, locations, groups) from public view, or bring them back. Nothing is deleted. */
+  async function setCreatorHidden(c: Creator, hidden: boolean) {
+    const { error } = await getSupabase().from('creators').update({ hidden }).eq('id', c.id);
+    if (error) {
+      setMsg({ text: /hidden/i.test(error.message) ? 'Hiding isn’t switched on yet. Run supabase/hide-creators.sql in Supabase once.' : error.message, err: true });
+      return;
+    }
+    setCreators((cs) => cs.map((x) => (x.id === c.id ? { ...x, hidden } : x)));
+    setMsg({ text: hidden
+      ? `@${c.tiktok_username} is hidden. Their profile, videos and locations are gone from public view. Unhide any time.`
+      : `@${c.tiktok_username} is public again.` });
+  }
+
   /** Permanently remove a creator: their login, profile, videos and any Featured Location of theirs. */
   async function deleteCreator(c: Creator) {
     const { error } = await getSupabase().rpc('admin_delete_creator', { target: c.id });
@@ -122,7 +135,7 @@ export default function AdminPage() {
         {tab === 'featured' && <FeaturedTab videos={videos} slots={slots} onSet={setSlot} />}
         {tab === 'locations' && <LocationsTab videos={videos} creators={creators} onSave={saveVideo} />}
         {tab === 'referrals' && <AdminReferrals />}
-        {tab === 'creators' && <CreatorsTab creators={creators} videos={videos} me={me} onDelete={deleteCreator} />}
+        {tab === 'creators' && <CreatorsTab creators={creators} videos={videos} me={me} onDelete={deleteCreator} onHide={setCreatorHidden} />}
       </div>
     </main>
     </>
@@ -243,8 +256,9 @@ function LocationsTab({ videos, creators, onSave }: {
 
 // ─── Creators ───────────────────────────────────────────────────────────────────
 
-function CreatorsTab({ creators, videos, me, onDelete }: {
+function CreatorsTab({ creators, videos, me, onDelete, onHide }: {
   creators: Creator[]; videos: PublicVideo[]; me: string | null; onDelete: (c: Creator) => Promise<boolean>;
+  onHide: (c: Creator, hidden: boolean) => Promise<void>;
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
@@ -267,7 +281,8 @@ function CreatorsTab({ creators, videos, me, onDelete }: {
             {(c.display_name || c.tiktok_username).charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-40">
-            <p className="text-sm font-semibold">{c.display_name || c.tiktok_username} <span className="font-normal text-gray-500">@{c.tiktok_username}</span></p>
+            <p className="text-sm font-semibold">{c.display_name || c.tiktok_username} <span className="font-normal text-gray-500">@{c.tiktok_username}</span>
+              {c.hidden && <span className="ml-2 align-middle px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">Hidden from public</span>}</p>
             <p className="text-xs text-gray-500">
               {stats[c.id]?.total ?? 0} video{(stats[c.id]?.total ?? 0) === 1 ? "" : "s"} · {stats[c.id]?.mapped ?? 0} on map · joined {new Date(c.created_at).toLocaleDateString()}
               {c.last_synced_at ? ` · synced ${new Date(c.last_synced_at).toLocaleDateString()}` : ' · never synced'}
@@ -276,6 +291,12 @@ function CreatorsTab({ creators, videos, me, onDelete }: {
           <div className="flex gap-2 text-xs">
             <Link href={`/c/${c.tiktok_username}`} className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">Page</Link>
             <a href={`https://www.tiktok.com/@${c.tiktok_username}`} target="_blank" rel="noopener" className="px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400">TikTok ↗</a>
+            {c.id !== me && (
+              <button onClick={() => onHide(c, !c.hidden)}
+                className={`px-3 py-1.5 rounded-full border ${c.hidden ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}>
+                {c.hidden ? 'Unhide' : 'Hide'}
+              </button>
+            )}
             {c.id !== me && (
               <button onClick={() => { setConfirming(confirming === c.id ? null : c.id); setTyped(''); }}
                 className="px-3 py-1.5 rounded-full border border-red-200 text-red-600 hover:bg-red-50">Delete</button>
