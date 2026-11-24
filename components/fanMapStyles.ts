@@ -237,6 +237,10 @@ export const FAN_CSS = `
     #pub.page .pubright.show{transform:translateY(0)}
   }
 
+  /* Search tab: no creator bar. The list scrolls inside its own box (15 places at a time). */
+  #pub.page.search .pubbar{display:none}
+  #pub.page.search .pagewrap{padding-top:12px}
+  #pub.page.search #pubList{overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;max-height:min(58vh,560px);padding:2px 2px 10px;align-content:start}
   /* Home page: only the map and its video panel; the bar, search and list are hidden. */
   #pub.page.home{height:100%}
   #pub.page.home .pagewrap{padding:0;max-width:none;height:100%}

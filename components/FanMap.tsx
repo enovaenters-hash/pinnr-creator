@@ -86,8 +86,10 @@ function groupPlaces(rows: Row[]): { places: Place[]; creators: CreatorInfo[] } 
  * only `initialCreator`'s spots are shown, and other parts of the page can open a spot by firing
  * `window.dispatchEvent(new CustomEvent('povgo:focus', { detail: { id: <video id>, play: true } }))`.
  */
-export default function FanMap({ initialCreator = null, embedded = false, home = false, view = null, mine = false }: {
+export default function FanMap({ initialCreator = null, embedded = false, home = false, view = null, mine = false, search = false }: {
   initialCreator?: string | null; embedded?: boolean;
+  /** Search tab: the full map, the category chips, and a scrolling list that shows 15 places at a time (15 more as you scroll). */
+  search?: boolean;
   /**
    * "My Map" on the fan page: same layout as /map, but it shows only the signed-in fan's saved videos and the
    * dropdown picks one of their lists ("All saved" or a list). A panel under the map edits the chosen list.
@@ -180,6 +182,9 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       let combinedMode = true;
       let PUBSET: Place[] = [];
       const pubActive = new Set<string>();
+      // Search tab: how many cards the list shows. Starts at 15 and grows by 15 each time you scroll to the bottom.
+      const SEARCH_STEP = 15;
+      let searchLimit = SEARCH_STEP, searchSig = '';
       let pubMarkers: Leaflet.Marker[] = [];
       let pubSel = -1, pubQuery = '';
       // Creator groups (creator page only): the "Showing" menu narrows the map and list to one public group.
@@ -777,19 +782,28 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       }
 
       function applyPubFilter(fit?: boolean) {
-        let shown = 0; const pts: [number, number][] = [];
+        let shown = 0, okCount = 0, listed = 0; const pts: [number, number][] = [];
+        if (search) {
+          // A new search or category starts the list over at 15, back at the top.
+          const sig = `${pubQuery}|${[...pubActive].sort().join(',')}|${groupOn}`;
+          if (sig !== searchSig) { searchSig = sig; searchLimit = SEARCH_STEP; $('pubList').scrollTop = 0; }
+        }
         PUBSET.forEach((p, i) => {
           const ok = visiblePub(i);
           const showPin = ok || pubVidP === p;
+          if (ok) okCount++;
+          const inList = ok && (!search || listed++ < searchLimit);
           if (pubMarkers[i]) { if (showPin) pubmap!.addLayer(pubMarkers[i]); else pubmap!.removeLayer(pubMarkers[i]); }
-          $('pubList').querySelectorAll(`.pcard[data-i="${i}"]`).forEach((c) => { (c as HTMLElement).style.display = ok ? '' : 'none'; });
+          $('pubList').querySelectorAll(`.pcard[data-i="${i}"]`).forEach((c) => { (c as HTMLElement).style.display = inList ? '' : 'none'; });
           if (showPin) { shown++; pts.push([p.lat, p.lon]); }
         });
         $('pubList').querySelectorAll('.gsec').forEach((sec) => {
           const any = [...sec.querySelectorAll('.pcard')].some((c) => (c as HTMLElement).style.display !== 'none');
           (sec as HTMLElement).style.display = any ? '' : 'none';
         });
-        $('pubCount').textContent = `${shown} place${shown === 1 ? '' : 's'}`;
+        $('pubCount').textContent = search
+          ? `Showing ${Math.min(searchLimit, okCount)} of ${okCount} place${okCount === 1 ? '' : 's'}`
+          : `${shown} place${shown === 1 ? '' : 's'}`;
         if (fit && view) pubmap!.setView(view.center, view.zoom);
         else if (fit) {
           if (pts.length === 1) pubmap!.setView(pts[0], 13);
@@ -798,6 +812,15 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         }
       }
 
+      if (search) {
+        // Scrolled to the bottom of the list: show 15 more.
+        $('pubList').addEventListener('scroll', () => {
+          const l = $('pubList');
+          if (l.scrollTop + l.clientHeight < l.scrollHeight - 60) return;
+          const total = PUBSET.filter((_, i) => visiblePub(i)).length;
+          if (searchLimit < total) { searchLimit += SEARCH_STEP; applyPubFilter(); }
+        });
+      }
       ($('pubSearch') as HTMLInputElement).oninput = (e) => { pubQuery = (e.target as HTMLInputElement).value.toLowerCase(); applyPubFilter(); };
       // Pop-up sheet controls exist only in the embedded layout.
       const sheetHandle = document.getElementById('sheetHandle'), srchToggle = document.getElementById('srchToggle');
@@ -858,7 +881,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       if (onGroup) window.removeEventListener('povgo:group', onGroup);
       pubmap?.remove(); pubmap = null;
     };
-  }, [initialCreator, embedded, home, view, mine]);
+  }, [initialCreator, embedded, home, view, mine, search]);
 
   if (!supabaseConfigured) return <p className="p-6 text-sm">Supabase isn&apos;t connected yet.</p>;
 
@@ -867,8 +890,8 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
     return (
       <>
         <style>{FAN_CSS}</style>
-        {!home && !mine && <SiteNav active="home" />}
-        <div id="pub" className={home ? 'page home' : mine ? 'page mine' : 'page'}>
+        {!home && !mine && <SiteNav active={search ? undefined : 'home'} />}
+        <div id="pub" className={home ? 'page home' : mine ? 'page mine' : search ? 'page search' : 'page'}>
           <div className="pagewrap">
             <div className="pubbar">
               <a className="pfp" id="pubPfp" href="/" title="POVGo home" />
