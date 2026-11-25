@@ -37,7 +37,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
     if (!supabaseConfigured) return;
     const supabase = getSupabase();
     (async () => {
-      const { data: c } = await supabase.from('creators').select('*').eq('tiktok_username', handle).maybeSingle();
+      const { data: c } = await supabase.from('creators').select('*').eq('tiktok_username', handle).eq('hidden', false).maybeSingle();
       setCreator((c as Creator) ?? null);
       if (!c) return;
       const { data: { session } } = await supabase.auth.getSession();

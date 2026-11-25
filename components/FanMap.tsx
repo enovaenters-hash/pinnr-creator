@@ -112,7 +112,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
 
     (async () => {
       const L = (await import('leaflet')).default;
-      const ROW_FIELDS = 'id, tiktok_id, posted_at, place_name, category, address, lat, lng, discount_code, featured, cover_url, creator_id, creators(tiktok_username, display_name, avatar_url)';
+      const ROW_FIELDS = 'id, tiktok_id, posted_at, place_name, category, address, lat, lng, discount_code, featured, cover_url, creator_id, creators!inner(tiktok_username, display_name, avatar_url)';
       type MineList = { id: string; name: string; ids: Set<string> };
       let data: unknown[] | null = null;
       const LISTS: MineList[] = [];
@@ -136,14 +136,14 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           const want = new Set<string>(ids);
           LISTS.forEach((l) => l.ids.forEach((i) => want.add(i)));
           if (want.size) {
-            const res = await sb.from('videos').select(ROW_FIELDS).in('id', [...want]).eq('hidden', false).not('lat', 'is', null)
+            const res = await sb.from('videos').select(ROW_FIELDS).in('id', [...want]).eq('hidden', false).eq('creators.hidden', false).not('lat', 'is', null)
               .order('posted_at', { ascending: false }).limit(3000);
             data = res.data;
           }
         }
       } else {
         const res = await getSupabase().from('videos').select(ROW_FIELDS)
-          .eq('hidden', false).not('lat', 'is', null)
+          .eq('hidden', false).eq('creators.hidden', false).not('lat', 'is', null)
           .order('posted_at', { ascending: false }).limit(5000);
         data = res.data;
       }
@@ -773,7 +773,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       async function loadGroups(handle: string) {
         const { data } = await getSupabase().from('creator_groups')
           .select('id, name, creators!inner(tiktok_username), creator_group_items(video_id)')
-          .eq('creators.tiktok_username', handle).eq('is_public', true).order('position').order('created_at');
+          .eq('creators.tiktok_username', handle).eq('creators.hidden', false).eq('is_public', true).order('position').order('created_at');
         if (disposed) return;
         const onMap = new Set(PUBSET.flatMap((p) => p.videos.map((v) => v.dbId)));
         GROUPS = ((data ?? []) as unknown as { id: string; name: string; creator_group_items: { video_id: string }[] }[])

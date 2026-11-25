@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import { CONTENT_TYPES, creatorTypes } from '@/lib/types';
 import {
-  FAN_VIDEO_FIELDS, catLabel, cityOf, formatMiles, milesBetween, timeAgo, videoHref,
+  FAN_VIDEO_FIELDS, FAN_VIDEO_FIELDS_NESTED, isVisibleVideo, catLabel, cityOf, formatMiles, milesBetween, timeAgo, videoHref,
   type FanCreator, type FanList, type FanVideo, type SavedVideo,
 } from '@/lib/fan';
 import BottomNav from '@/components/BottomNav';
@@ -67,7 +67,7 @@ export default function FanPage() {
   const loadFeed = useCallback(async (ids: string[]) => {
     if (!ids.length) { setFeed([]); return; }
     const { data } = await getSupabase().from('videos').select(FAN_VIDEO_FIELDS)
-      .in('creator_id', ids).eq('hidden', false)
+      .in('creator_id', ids).eq('hidden', false).eq('creators.hidden', false)
       .order('posted_at', { ascending: false, nullsFirst: false }).limit(30);
     setFeed((data as unknown as FanVideo[]) ?? []);
   }, []);
@@ -75,7 +75,7 @@ export default function FanPage() {
   /** Newest videos from creators this person doesn't follow yet (their own are left out). */
   const loadDiscover = useCallback(async (ids: string[], me: string) => {
     let q = getSupabase().from('videos').select(FAN_VIDEO_FIELDS)
-      .eq('hidden', false).neq('creator_id', me)
+      .eq('hidden', false).eq('creators.hidden', false).neq('creator_id', me)
       .order('posted_at', { ascending: false, nullsFirst: false }).limit(80);
     if (ids.length) q = q.not('creator_id', 'in', `(${ids.join(',')})`);
     const { data } = await q;
@@ -106,17 +106,17 @@ export default function FanPage() {
       if (!session) { setUid(null); return; }
       const id = session.user.id;
       const [f, s, l, c, me] = await Promise.all([
-        supabase.from('follows').select('creator_id, creators(id, tiktok_username, display_name, avatar_url)').eq('user_id', id),
-        supabase.from('saved_videos').select(`created_at, videos(${FAN_VIDEO_FIELDS})`).eq('user_id', id).order('created_at', { ascending: false }),
+        supabase.from('follows').select('creator_id, creators(id, tiktok_username, display_name, avatar_url, hidden)').eq('user_id', id),
+        supabase.from('saved_videos').select(`created_at, videos(${FAN_VIDEO_FIELDS_NESTED})`).eq('user_id', id).order('created_at', { ascending: false }),
         supabase.from('lists').select('id, name, list_items(video_id)').eq('user_id', id).order('created_at'),
-        supabase.from('creators').select('id, tiktok_username, display_name, avatar_url').order('created_at', { ascending: false }).limit(60),
+        supabase.from('creators').select('id, tiktok_username, display_name, avatar_url').eq('hidden', false).order('created_at', { ascending: false }).limit(60),
         supabase.from('creators').select('display_name, tiktok_username').eq('id', id).maybeSingle(),
       ]);
       const followed = ((f.data ?? []) as unknown as { creators: FanCreator | null }[])
-        .map((r) => r.creators).filter((x): x is FanCreator => Boolean(x));
+        .map((r) => r.creators).filter((x): x is FanCreator => Boolean(x) && !(x as { hidden?: boolean }).hidden);
       setFollows(followed);
       setSaved(((s.data ?? []) as unknown as { created_at: string; videos: FanVideo | null }[])
-        .filter((r) => r.videos).map((r) => ({ savedAt: r.created_at, video: r.videos! })));
+        .filter((r) => isVisibleVideo(r.videos)).map((r) => ({ savedAt: r.created_at, video: r.videos! })));
       setLists(((l.data ?? []) as unknown as { id: string; name: string; list_items: { video_id: string }[] }[])
         .map((r) => ({ id: r.id, name: r.name, videoIds: (r.list_items ?? []).map((i) => i.video_id) })));
       setCreators(((c.data as FanCreator[]) ?? []).filter((x) => x.id !== id)); // don't offer to follow yourself
@@ -151,11 +151,11 @@ export default function FanPage() {
     const reload = async () => {
       const supabase = getSupabase();
       const [s, l] = await Promise.all([
-        supabase.from('saved_videos').select(`created_at, videos(${FAN_VIDEO_FIELDS})`).eq('user_id', uid).order('created_at', { ascending: false }),
+        supabase.from('saved_videos').select(`created_at, videos(${FAN_VIDEO_FIELDS_NESTED})`).eq('user_id', uid).order('created_at', { ascending: false }),
         supabase.from('lists').select('id, name, list_items(video_id)').eq('user_id', uid).order('created_at'),
       ]);
       setSaved(((s.data ?? []) as unknown as { created_at: string; videos: FanVideo | null }[])
-        .filter((r) => r.videos).map((r) => ({ savedAt: r.created_at, video: r.videos! })));
+        .filter((r) => isVisibleVideo(r.videos)).map((r) => ({ savedAt: r.created_at, video: r.videos! })));
       setLists(((l.data ?? []) as unknown as { id: string; name: string; list_items: { video_id: string }[] }[])
         .map((r) => ({ id: r.id, name: r.name, videoIds: (r.list_items ?? []).map((i) => i.video_id) })));
     };
