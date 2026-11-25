@@ -30,3 +30,11 @@ alter table public.imported_spots enable row level security;
 drop policy if exists "imported spots own" on public.imported_spots;
 create policy "imported spots own" on public.imported_spots
   for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Public/private per collection (all spots of a collection share one setting). Private by default.
+alter table public.imported_spots add column if not exists is_public boolean not null default false;
+
+-- Anyone can see spots of a collection the owner made public (unless the owner's profile is hidden).
+drop policy if exists "imported spots public read" on public.imported_spots;
+create policy "imported spots public read" on public.imported_spots
+  for select using (is_public and not public.creator_is_hidden(user_id));
