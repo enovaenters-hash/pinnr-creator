@@ -35,7 +35,11 @@ export async function POST(request: Request) {
     if (body.action === 'import') {
       if (!body.collectionId) return NextResponse.json({ error: 'Pick a collection.' }, { status: 400 });
       const items = await collectionItems(body.collectionId);
-      const colName = (body.name ?? 'TikTok collection').slice(0, 60);
+      // Importing more of a collection you already have keeps the name and public/private setting you chose.
+      const { data: prev } = await supabase.from('imported_spots').select('collection_name, is_public')
+        .eq('user_id', user.id).eq('collection_id', body.collectionId).limit(1);
+      const colName = ((prev?.[0]?.collection_name as string | undefined) ?? body.name ?? 'TikTok collection').slice(0, 60);
+      const isPublic = Boolean(prev?.[0]?.is_public);
       const rows = items.map((v) => {
         const loc = extractLocation(v.caption);
         const poi = v.poi;
@@ -46,6 +50,7 @@ export async function POST(request: Request) {
           tiktok_id: v.tiktokId,
           collection_id: body.collectionId,
           collection_name: colName,
+          is_public: isPublic,
           author_handle: v.authorHandle,
           author_name: v.authorName,
           caption: v.caption,
