@@ -47,7 +47,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
           .eq('user_id', session.user.id).eq('creator_id', c.id).maybeSingle();
         setFollowing(Boolean(f));
       }
-      document.title = `${c.display_name || c.tiktok_username}'s Top 3 · POVGo`;
+      document.title = `@${c.tiktok_username}'s Top 3 · POVGo`;
 
       // Top picks first (newest first); fill any empty slots with the newest mapped videos.
       const { data: picks } = await supabase.from('videos').select(FIELDS)
@@ -117,7 +117,8 @@ export default function CreatorPage({ handle }: { handle: string }) {
     );
   }
 
-  const name = creator?.display_name || creator?.tiktok_username || handle;
+  // The page is headed by the creator's handle, not their display name.
+  const name = `@${creator?.tiktok_username || handle}`;
   const cols = top && top.length ? top.length : 3;
   const showFollow = Boolean(creator) && creator?.id !== uid;
 
@@ -126,7 +127,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
       <SiteNav compact />
       <main className="flex-1 bg-cloud text-ink">
         <div className="max-w-5xl mx-auto px-4 pb-28">
-          {/* Who: photo, then name (shrinks to fit one line) over handle + small buttons */}
+          {/* Who: photo, then @handle (shrinks to fit one line) over the spot count + small buttons */}
           <header className="pt-5 pb-4 flex items-center gap-3 sm:gap-4">
             <Avatar creator={creator} handle={handle} />
             <div className="min-w-0 flex-1 [container-type:inline-size]">
@@ -144,7 +145,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
               </div>
               <div className="mt-1 flex items-center gap-2">
                 <p className="min-w-0 truncate text-[11px] min-[380px]:text-xs sm:text-sm font-bold text-gray-500">
-                  @{handle}{spots !== null && <> · {spots} spot{spots === 1 ? '' : 's'}</>}
+                  {spots !== null ? <>{spots} spot{spots === 1 ? '' : 's'}</> : <>&nbsp;</>}
                 </p>
                 <div className="ml-auto flex shrink-0 gap-1 sm:gap-1.5">
                   <button onClick={share} className="btn-ghost px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs">{copied ? 'Copied' : 'Share'}</button>
@@ -204,7 +205,7 @@ export default function CreatorPage({ handle }: { handle: string }) {
 }
 
 function Avatar({ creator, handle }: { creator: Creator | undefined; handle: string }) {
-  const letter = (creator?.display_name || handle).charAt(0).toUpperCase();
+  const letter = (creator?.tiktok_username || handle).charAt(0).toUpperCase();
   return (
     <div className="relative w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-frost text-glacier font-display text-2xl font-semibold flex items-center justify-center shrink-0 overflow-hidden border-[3px] sm:border-4 border-white shadow">
       {letter}
