@@ -18,11 +18,11 @@ const PHOENIX = { center: [33.4484, -112.074] as [number, number], zoom: 10 };
 type NewCreator = Creator & { spots: number };
 type Stats = { creators: number | null; locations: number | null; videos: number | null };
 
-const VIDEO_FIELDS = '*, creators(tiktok_username, display_name, avatar_url)';
+const VIDEO_FIELDS = '*, creators!inner(tiktok_username, display_name, avatar_url)';
 // The map + Explore grid also need each creator's content types. content_types only exists once multi-types.sql
 // has been run, so fall back to the older single column rather than lose the map.
-const VIDEO_FIELDS_TYPES = '*, creators(tiktok_username, display_name, avatar_url, content_type, content_types)';
-const VIDEO_FIELDS_TYPES_OLD = '*, creators(tiktok_username, display_name, avatar_url, content_type)';
+const VIDEO_FIELDS_TYPES = '*, creators!inner(tiktok_username, display_name, avatar_url, content_type, content_types)';
+const VIDEO_FIELDS_TYPES_OLD = '*, creators!inner(tiktok_username, display_name, avatar_url, content_type)';
 
 /** Home screen: choose a view, plus Featured Locations, New POVs and New Creators. */
 export default function Home() {
@@ -50,26 +50,26 @@ export default function Home() {
       .eq('hidden', false).eq('creators.hidden', false)
       .then(({ count }) => { if (count !== null) setStats((s) => ({ ...s, videos: count })); });
 
-    const loadAll = (fields: string) => supabase.from('videos').select(fields).eq('hidden', false).not('lat', 'is', null)
+    const loadAll = (fields: string) => supabase.from('videos').select(fields).eq('hidden', false).eq('creators.hidden', false).not('lat', 'is', null)
       .order('created_at', { ascending: false }).order('posted_at', { ascending: false }).limit(1000);
     loadAll(VIDEO_FIELDS_TYPES).then(async ({ data, error }) => {
       if (error) ({ data } = await loadAll(VIDEO_FIELDS_TYPES_OLD));
       setMapVideos((data as unknown as PublicVideo[]) ?? []);
     });
 
-    supabase.from('featured_locations').select(`slot, video:videos(${VIDEO_FIELDS})`).order('slot')
+    supabase.from('featured_locations').select(`slot, video:videos(*, creators(tiktok_username, display_name, avatar_url, hidden))`).order('slot')
       .then(({ data }) => setFeatured(
         ((data ?? []) as unknown as { video: PublicVideo | null }[])
-          .map((r) => r.video).filter((v): v is PublicVideo => Boolean(v && v.lat !== null && !v.hidden)),
+          .map((r) => r.video).filter((v): v is PublicVideo => Boolean(v && v.lat !== null && !v.hidden && !(v.creators as { hidden?: boolean } | null)?.hidden)),
       ));
 
     supabase.from('videos').select(VIDEO_FIELDS)
-      .eq('hidden', false).not('lat', 'is', null)
+      .eq('hidden', false).eq('creators.hidden', false).not('lat', 'is', null)
       .order('created_at', { ascending: false }).order('posted_at', { ascending: false }).limit(3)
       .then(({ data }) => setNewPovs((data as PublicVideo[]) ?? []));
 
     (async () => {
-      const { data } = await supabase.from('creators').select('*').order('created_at', { ascending: false }).limit(3);
+      const { data } = await supabase.from('creators').select('*').eq('hidden', false).order('created_at', { ascending: false }).limit(3);
       const rows = (data as Creator[]) ?? [];
       const withCounts = await Promise.all(rows.map(async (c) => {
         const { count } = await supabase.from('videos').select('id', { count: 'exact', head: true })
@@ -84,7 +84,7 @@ export default function Home() {
     const next = !showAllCreators;
     setShowAllCreators(next);
     if (next && allCreators === null && supabaseConfigured) {
-      const { data } = await getSupabase().from('creators').select('*').order('created_at', { ascending: false }).limit(500);
+      const { data } = await getSupabase().from('creators').select('*').eq('hidden', false).order('created_at', { ascending: false }).limit(500);
       setAllCreators((data as Creator[]) ?? []);
     }
   }
