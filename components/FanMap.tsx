@@ -113,7 +113,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
     (async () => {
       const L = (await import('leaflet')).default;
       const ROW_FIELDS = 'id, tiktok_id, posted_at, place_name, category, address, lat, lng, discount_code, featured, cover_url, creator_id, creators!inner(tiktok_username, display_name, avatar_url)';
-      type MineList = { id: string; name: string; ids: Set<string> };
+      type MineList = { id: string; name: string; ids: Set<string>; /** a TikTok collection the fan imported: read-only group */ imp?: boolean };
       let data: unknown[] | null = null;
       const LISTS: MineList[] = [];
       let mineUser: string | null = null;
@@ -139,6 +139,28 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
             const res = await sb.from('videos').select(ROW_FIELDS).in('id', [...want]).eq('hidden', false).eq('creators.hidden', false).not('lat', 'is', null)
               .order('posted_at', { ascending: false }).limit(3000);
             data = res.data;
+          }
+          // Spots imported from the fan's public TikTok collections: one read-only group per collection.
+          const imp = await sb.from('imported_spots')
+            .select('id, tiktok_id, posted_at, place_name, category, address, lat, lng, cover_url, author_handle, author_name, collection_id, collection_name')
+            .eq('user_id', mineUser).not('lat', 'is', null).limit(3000);
+          if (!imp.error && imp.data?.length) {
+            const groups = new Map<string, MineList>();
+            const rows: unknown[] = [];
+            for (const r of imp.data as Record<string, unknown>[]) {
+              const dbId = `imp:${r.id as string}`;
+              const gid = `imp-${(r.collection_id as string | null) ?? (r.collection_name as string | null) ?? 'tiktok'}`;
+              let g = groups.get(gid);
+              if (!g) { g = { id: gid, name: (r.collection_name as string | null) || 'TikTok collection', ids: new Set(), imp: true }; groups.set(gid, g); LISTS.push(g); }
+              g.ids.add(dbId);
+              rows.push({
+                id: dbId, tiktok_id: r.tiktok_id, posted_at: r.posted_at, place_name: r.place_name, category: r.category,
+                address: r.address, lat: r.lat, lng: r.lng, discount_code: null, featured: false, cover_url: r.cover_url,
+                creator_id: (r.author_handle as string | null) ?? 'tiktok',
+                creators: { tiktok_username: (r.author_handle as string | null) ?? 'tiktok', display_name: (r.author_name as string | null) ?? null, avatar_url: null },
+              });
+            }
+            data = [...(data ?? []), ...rows];
           }
         }
       } else {
@@ -240,7 +262,9 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
       };
       const colorOf = (p: Place) => (mine ? gdef(p.gk)?.color ?? ICE : ICE);
       const defaultKey = () => 'all';
-      const isList = (k: string | null) => !!k && LISTS.some((x) => x.id === k);
+      const isList = (k: string | null) => !!k && LISTS.some((x) => x.id === k && !x.imp);
+      const isImp = (id: string) => id.startsWith('imp:');
+      const realLists = () => LISTS.filter((l) => !l.imp);
       const spotWord = (n: number) => `${n} spot${n === 1 ? '' : 's'}`;
       let gMode: 'idle' | 'new' | 'edit' = 'idle';
       let gRename: string | null = null, gDelete: string | null = null;
@@ -261,6 +285,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           `<button type="button" class="gtile${CUR === key ? ' on' : ''}" data-g="${esc(key)}" style="--gc:${color}" aria-pressed="${CUR === key}">
             ${collage(coversOf(ps))}<span class="gnm">${esc(name)}</span><span class="gct">${spotWord(ps.length)}</span></button>`;
         const editTile = (g: GDef) => {
+          if (LISTS.find((l) => l.id === g.key)?.imp) return `<div class="gtile ed" style="--gc:${g.color}">${collage(coversOf(placesFor(g.key)))}<span class="gnm">${esc(g.name)}</span><span class="gct">From TikTok</span></div>`;
           const pics = collage(coversOf(placesFor(g.key)));
           let body: string;
           if (gDelete === g.key) body = `<span class="gnm">Delete?</span><span class="gct">Spots stay saved</span><span class="gbtns"><button type="button" class="gnb danger" data-ga="delete-yes" data-lid="${esc(g.key)}">Delete</button><button type="button" class="gnb" data-ga="cancel">Keep</button></span>`;
@@ -272,7 +297,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           ? `<div class="gtile new form"><form class="gform" data-gform="new"><input name="n" placeholder="Date night" maxlength="60" aria-label="New group name" autocomplete="off"><span class="gbtns"><button type="submit" class="gnb sun">Create</button><button type="button" class="gnb" data-ga="cancel">Cancel</button></span></form></div>`
           : gMode === 'edit'
             ? `<div class="gtile new"><button type="button" class="gnb sun" data-ga="done">Done</button></div>`
-            : `<div class="gtile new"><button type="button" class="gnb" data-ga="new">+ New list</button>${LISTS.length ? '<button type="button" class="gnb" data-ga="edit">Edit groups</button>' : ''}</div>`;
+            : `<div class="gtile new"><button type="button" class="gnb" data-ga="new">+ New list</button>${realLists().length ? '<button type="button" class="gnb" data-ga="edit">Edit groups</button>' : ''}</div>`;
         el.innerHTML = tile('all', 'All', INK, placesFor('all'))
           + groupDefs().map((g) => (gMode === 'edit' ? editTile(g) : tile(g.key, g.name, g.color, placesFor(g.key)))).join('')
           + last;
@@ -491,19 +516,19 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
           <div class="rv"><div class="rstage">${playMode ? playerHtml(v) : posterHtml(v)}</div><button class="mback" data-act="back">← Back to Map</button>${clipnav}</div>
           <div class="rmeta ${collapsed ? 'collapsed' : ''}">
             <h3 data-act="toggle"><span>${esc(p.name)}</span><span class="tag-in-header" style="background:${cColor(p.cuisine)}">#${esc(p.cuisine)}</span><span class="toggle-arrow">▼</span></h3>
-            ${combinedMode ? `<div class="rby"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}">@${esc(p.creator)}</a> · ${esc(p.creatorName)}</div>` : ''}
+            ${combinedMode ? `<div class="rby"><span class="d" style="background:${p.accent}"></span>${isImp(v.dbId) ? `<span class="clink">@${esc(p.creator)}</span>` : `<a class="clink" href="/c/${encodeURIComponent(p.creator)}">@${esc(p.creator)}</a>`} · ${esc(p.creatorName)}</div>` : ''}
             <div class="raddr">📍 ${esc(p.addr)}</div>
             ${v.code ? `<div class="rcode">🏷 Code: ${esc(v.code)}</div>` : ''}
             <div class="info-row">${grid}</div>
             <div class="rbtns">
               <a class="rbtn go" target="_blank" rel="noopener" href="https://www.google.com/maps/search/${encodeURIComponent(p.addr)}">Directions ›</a>
               <a class="rbtn tt" target="_blank" rel="noopener" href="https://www.tiktok.com/@${encodeURIComponent(p.creator)}/video/${encodeURIComponent(v.id)}">▶ TikTok</a>
-              <button class="rbtn sv${savedSet.has(v.dbId) ? ' on' : ''}" data-act="save" data-id="${esc(v.dbId)}" aria-pressed="${savedSet.has(v.dbId)}">${savedSet.has(v.dbId) ? '♥ Saved' : '♡ Save'}</button>
+              ${isImp(v.dbId) ? '' : `<button class="rbtn sv${savedSet.has(v.dbId) ? ' on' : ''}" data-act="save" data-id="${esc(v.dbId)}" aria-pressed="${savedSet.has(v.dbId)}">${savedSet.has(v.dbId) ? '♥ Saved' : '♡ Save'}</button>`}
             </div>
-            <div class="rbtns2"><button class="rbtn ls" type="button" data-act="lists" data-id="${esc(v.dbId)}" aria-expanded="false">＋ Add to a group</button></div>
-            <div class="rlists" hidden></div>
+            ${isImp(v.dbId) ? '' : `<div class="rbtns2"><button class="rbtn ls" type="button" data-act="lists" data-id="${esc(v.dbId)}" aria-expanded="false">＋ Add to a group</button></div>
+            <div class="rlists" hidden></div>`}
           </div>`;
-        renderListPicker(v.dbId);
+        if (!isImp(v.dbId)) renderListPicker(v.dbId);
         if (playMode) watchForSlowPlayer();
       }
 
@@ -621,14 +646,14 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         el.hidden = !open;
         opener?.classList.toggle('open', open); opener?.setAttribute('aria-expanded', String(open));
         if (!open) return;
-        const chips = LISTS.map((l) => {
+        const chips = realLists().map((l) => {
           const has = l.ids.has(dbId);
           return `<button type="button" class="lchip${has ? ' on' : ''}" data-act="list" data-lid="${esc(l.id)}" data-id="${esc(dbId)}" aria-pressed="${has}">${has ? '✓ ' : ''}${esc(l.name)}</button>`;
         }).join('');
-        const form = listNew || !LISTS.length
+        const form = listNew || !realLists().length
           ? `<form class="rl-form" data-id="${esc(dbId)}"><input name="n" placeholder="Date night" maxlength="60" aria-label="New group name" autocomplete="off"><button class="lchip on" type="submit">Create</button></form>` : '';
-        el.innerHTML = `<div class="rl-h">${!savedSet.has(dbId) ? (LISTS.length ? 'Pick a group to save this spot' : 'Make a group to save this spot') : LISTS.length ? 'Add to a group' : 'Make your first group'}</div>
-          <div class="rl-chips">${chips}${listNew || !LISTS.length ? '' : '<button type="button" class="lchip new" data-act="newlist">+ New group</button>'}</div>${form}`;
+        el.innerHTML = `<div class="rl-h">${!savedSet.has(dbId) ? (realLists().length ? 'Pick a group to save this spot' : 'Make a group to save this spot') : realLists().length ? 'Add to a group' : 'Make your first group'}</div>
+          <div class="rl-chips">${chips}${listNew || !realLists().length ? '' : '<button type="button" class="lchip new" data-act="newlist">+ New group</button>'}</div>${form}`;
         if (listNew) (el.querySelector('input') as HTMLInputElement | null)?.focus();
       }
       /** Saving is what puts a video in My Videos, so adding it to a group saves it too. */
@@ -720,7 +745,7 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         const mkCard = (p: Place, i: number, gk: string | null) => {
           const card = document.createElement('div'); card.className = 'pcard' + (i === pubSel ? ' on' : ''); card.dataset.i = String(i);
           const remove = mine && isList(gk) ? '<button class="premove" type="button">Remove</button>' : '';
-          const by = combinedMode ? `<span class="by"><span class="d" style="background:${p.accent}"></span><a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a></span>` : '';
+          const by = combinedMode ? `<span class="by"><span class="d" style="background:${p.accent}"></span>${p.videos.some((x) => isImp(x.dbId)) ? `<span class="clink">@${esc(p.creator)}</span>` : `<a class="clink" href="/c/${encodeURIComponent(p.creator)}" onclick="event.stopPropagation()">@${esc(p.creator)}</a>`}</span>` : '';
           const mt = `<span class="cz" style="background:${cColor(p.cuisine)}">${esc(cLabel(p.cuisine))}</span> ${esc(p.city)}${p.videos.length > 1 ? ` <span class="vcount">🔁 ${p.videos.length}</span>` : ''}${p.featured ? ' <span class="star">★ TOP PICK</span>' : ''}`;
           // Name (with Remove far right) on top; creator, label and city share the next line.
           card.innerHTML = `<div class="ctop"><h4>${esc(p.name)}</h4>${remove}</div>
