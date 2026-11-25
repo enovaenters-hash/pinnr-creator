@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import VideoEditForm from '@/components/VideoEditForm';
 import ConnectedAccounts from '@/components/ConnectedAccounts';
 import ReferralPanel from '@/components/ReferralPanel';
+import ImportCollections from '@/components/ImportCollections';
 import { NotConfigured, Switch, inputClass, primaryBtn } from '@/components/AuthCard';
 import SiteNav from '@/components/SiteNav';
 import type { MapPin } from '@/components/Map';
@@ -215,7 +216,7 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
     return <Shell embedded={embedded}><p className="py-16 text-center text-sm text-gray-500">Loading…</p></Shell>;
   }
   if (!creator) {
-    return <Shell embedded={embedded}><BecomeCreator onDone={load} /></Shell>;
+    return <Shell embedded={embedded}><BecomeCreator onDone={load} /><div className="mt-6"><ImportCollections canPublish={false} /></div></Shell>;
   }
 
   return (
@@ -290,6 +291,9 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
         {/* Groups */}
         <GroupsPanel ready={groupsReady} groups={groups} onCreate={createGroup}
           onRename={renameGroup} onDelete={deleteGroup} onSetPublic={setGroupPublic} />
+
+        {/* Imported TikTok collections */}
+        <ImportCollections canPublish />
 
         {/* Videos */}
         <section>

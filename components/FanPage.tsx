@@ -14,7 +14,6 @@ import SiteNav from '@/components/SiteNav';
 import CreatorDashboard from '@/components/CreatorDashboard';
 import { NotConfigured } from '@/components/AuthCard';
 
-import ImportCollections from '@/components/ImportCollections';
 const FanMap = dynamic(() => import('@/components/FanMap'), { ssr: false });
 
 /** Three main parts: Explore (the public home page, unchanged), Following and My Spots. */
@@ -54,7 +53,6 @@ export default function FanPage() {
   const [pickNew, setPickNew] = useState('');
   const [discover, setDiscover] = useState<FanVideo[] | null>(null);
   const [dtypes, setDtypes] = useState<string[]>([]); // chosen discover types; empty = All
-  const [mapTick, setMapTick] = useState(0); // bumps after an import so the Group Maps reload
 
   const go = useCallback((v: View, t: FTab = 'latest') => {
     setView(v); setFtab(t);
@@ -435,8 +433,7 @@ export default function FanPage() {
           {view === 'following' && (
             <section id="following-map" aria-label="Group Maps" className="mt-10 scroll-mt-4">
               <h2 className="text-xl font-semibold mb-3">Group Maps</h2>
-              <ImportCollections onChanged={() => setMapTick((t) => t + 1)} />
-              <FanMap key={mapTick} mine />
+              <FanMap mine />
             </section>
           )}
 
