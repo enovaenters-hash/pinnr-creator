@@ -10,8 +10,9 @@ import VideoEditForm from '@/components/VideoEditForm';
 import { NotConfigured } from '@/components/AuthCard';
 import SiteNav from '@/components/SiteNav';
 import AdminReferrals from '@/components/AdminReferrals';
+import AdminPromo from '@/components/AdminPromo';
 
-type Tab = 'featured' | 'locations' | 'creators' | 'referrals';
+type Tab = 'featured' | 'locations' | 'creators' | 'referrals' | 'promo';
 type Status = 'loading' | 'signedOut' | 'denied' | 'ready';
 
 /** Admin: pick Featured Locations for the home screen, edit any creator's spots, see all creators. */
@@ -122,7 +123,7 @@ export default function AdminPage() {
         </header>
 
         <nav className="flex gap-2 mb-5 text-sm overflow-x-auto">
-          {([['featured', 'Featured Locations'], ['locations', 'All Locations'], ['creators', 'Creators'], ['referrals', 'Referrals']] as [Tab, string][]).map(([t, label]) => (
+          {([['featured', 'Featured Locations'], ['locations', 'All Locations'], ['creators', 'Creators'], ['referrals', 'Referrals'], ['promo', 'Promo']] as [Tab, string][]).map(([t, label]) => (
             <button key={t} onClick={() => { setTab(t); setMsg(null); }}
               className={`px-4 py-2 rounded-full font-bold whitespace-nowrap ${tab === t ? 'bg-ink text-white' : 'bg-white text-gray-600 hover:text-ink'}`}>
               {label}
@@ -135,6 +136,7 @@ export default function AdminPage() {
         {tab === 'featured' && <FeaturedTab videos={videos} slots={slots} onSet={setSlot} />}
         {tab === 'locations' && <LocationsTab videos={videos} creators={creators} onSave={saveVideo} />}
         {tab === 'referrals' && <AdminReferrals />}
+        {tab === 'promo' && <AdminPromo />}
         {tab === 'creators' && <CreatorsTab creators={creators} videos={videos} me={me} onDelete={deleteCreator} onHide={setCreatorHidden} />}
       </div>
     </main>
