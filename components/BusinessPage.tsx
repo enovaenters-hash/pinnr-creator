@@ -159,7 +159,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
           {(loading || top.length > 0) && (
             <section aria-labelledby="top3">
               <h2 id="top3" className="text-xl sm:text-2xl font-semibold mb-3">Top {top.length || 3}</h2>
-              <ol className="grid gap-2 sm:gap-4" style={{ gridTemplateColumns: `repeat(${loading ? 3 : top.length}, minmax(0, 1fr))` }}>
+              <ol className="grid gap-2 sm:gap-4" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
                 {loading
                   ? [0, 1, 2].map((i) => <li key={i} className="aspect-[3/4] sm:aspect-[4/5] rounded-xl bg-white animate-pulse" />)
                   : top.map((v, i) => (
