@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import PromoPopup from "@/components/PromoPopup";
 
 // Self-hosted variable fonts (OFL, from Fontsource) so builds never depend on Google Fonts.
 const fredoka = localFont({ src: "./fonts/fredoka.woff2", weight: "300 700", variable: "--font-fredoka", display: "swap" });
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`h-full ${fredoka.variable} ${nunito.variable} ${sora.variable}`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">{children}<PromoPopup /></body>
     </html>
   );
 }
