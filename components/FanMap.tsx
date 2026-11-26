@@ -517,6 +517,8 @@ export default function FanMap({ initialCreator = null, embedded = false, home =
         return `<div class="rposter" data-act="play">${coverImg(v)}<button class="rplay" data-act="play" aria-label="Play video">▶</button><span class="rhint">Tap to play</span></div>`;
       }
       function playerHtml(v: Vid, bust = false) {
+        // Lets the promo pop-up count plays (a retry of the same video isn't a new play).
+        if (!bust) window.dispatchEvent(new CustomEvent('povgo:play', { detail: { id: v.id } }));
         return `<iframe src="${playerSrc(v.id, bust)}" allow="autoplay;encrypted-media;fullscreen" allowfullscreen></iframe>`;
       }
       function failHtml(v: Vid, creator: string) {

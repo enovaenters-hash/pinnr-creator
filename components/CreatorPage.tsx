@@ -157,6 +157,10 @@ export default function CreatorPage({ handle }: { handle: string }) {
             </div>
           </header>
 
+          {creator?.bio && (
+            <p className="-mt-1 mb-4 text-sm sm:text-base font-bold text-gray-700 whitespace-pre-line break-words">{creator.bio}</p>
+          )}
+
           {/* Top 3, one row, fit to width */}
           {top === null ? (
             <div className="grid grid-cols-3 gap-2 sm:gap-4">

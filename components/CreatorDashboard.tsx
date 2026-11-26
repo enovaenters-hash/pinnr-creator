@@ -42,6 +42,8 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
   /** How many fans saved each video (video id -> count). Empty until supabase/referrals.sql has been run. */
   const [saves, setSaves] = useState<Record<string, number>>({});
   const [sort, setSort] = useState<Sort>('new');
+  /** The bio box: null until the creator types, so it follows the saved value until then. */
+  const [bioDraft, setBioDraft] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = getSupabase();
@@ -127,6 +129,19 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
       .update({ content_types: ordered, content_type: ordered[0] }).eq('id', creator.id);
     if (error) { setCreator(before); setStatus({ text: 'Couldn’t save your content types. Try again.', tone: 'err' }); }
     else setStatus({ text: 'Content types saved', tone: 'ok' });
+  }
+
+  async function saveBio() {
+    if (!creator || bioDraft === null) return;
+    const bio = bioDraft.trim().slice(0, 150);
+    const { error } = await getSupabase().from('creators').update({ bio: bio || null }).eq('id', creator.id);
+    if (error) {
+      setStatus({ text: /bio/i.test(error.message) ? 'Bios need one setup step: run supabase/creator-bio.sql in Supabase.' : 'Couldn’t save your bio. Try again.', tone: 'err' });
+      return;
+    }
+    setCreator({ ...creator, bio: bio || null });
+    setBioDraft(null);
+    setStatus({ text: bio ? 'Bio saved' : 'Bio removed', tone: 'ok' });
   }
 
   async function createGroup(name: string): Promise<string | null> {
@@ -257,6 +272,20 @@ export default function CreatorDashboard({ embedded = false }: { embedded?: bool
                   </button>
                 );
               })}
+            </div>
+          </div>
+          <div className="mt-4">
+            <label htmlFor="creator-bio" className="block text-xs font-bold text-gray-500 mb-1.5">Your bio. Shows at the top of your page.</label>
+            <textarea id="creator-bio" rows={2} maxLength={150} value={bioDraft ?? creator.bio ?? ''} onChange={(e) => setBioDraft(e.target.value)}
+              placeholder="Phoenix food POVs. New spot every week." className="w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-sm outline-none focus:border-ice" />
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-xs font-bold text-gray-500">{(bioDraft ?? creator.bio ?? '').length}/150</span>
+              {bioDraft !== null && bioDraft.trim() !== (creator.bio ?? '') && (
+                <>
+                  <button type="button" onClick={saveBio} className="btn-sun px-4 py-1 text-xs">Save bio</button>
+                  <button type="button" onClick={() => setBioDraft(null)} className="text-xs text-gray-500">Cancel</button>
+                </>
+              )}
             </div>
           </div>
           <ConnectedAccounts onMessage={(text, tone) => setStatus({ text, tone })} onChanged={load} />
