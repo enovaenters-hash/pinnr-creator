@@ -11,6 +11,8 @@ export interface Creator {
   content_type?: string | null;
   /** Set by an admin: the profile, videos and locations are hidden from public view. */
   hidden?: boolean;
+  /** Short line shown at the top of the creator's page (150 characters max). */
+  bio?: string | null;
 }
 
 /** Content types a creator can attach to their feed. */
