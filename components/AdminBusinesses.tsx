@@ -5,6 +5,7 @@ import { getSupabase } from '@/lib/supabase';
 import { inputClass } from '@/components/AuthCard';
 import { matchesKey, normKey, type BusinessInfo } from '@/lib/business';
 import type { PublicVideo } from '@/components/PublicMap';
+import BusinessBackground from '@/components/BusinessBackground';
 
 const BLANK = (name: string): BusinessInfo => {
   const key = normKey(name).slice(0, 60);
@@ -85,6 +86,8 @@ export default function AdminBusinesses({ videos }: { videos: PublicVideo[] }) {
       bio: edit.bio.trim().slice(0, 600), address: edit.address.trim().slice(0, 200), website: edit.website.trim().slice(0, 300),
       top_video_ids: edit.top_video_ids.slice(0, 3), updated_at: new Date().toISOString(),
     };
+    // Only sent once the background columns exist (supabase/business-backgrounds.sql) or one was just chosen.
+    if (edit.bg_url !== undefined) { row.bg_url = edit.bg_url; row.bg_tone = edit.bg_tone ?? 'light'; }
     if (row.slug.length < 2 || row.match_key.length < 2 || !row.name) { setMsg({ text: 'Name, link and match name need at least 2 letters or numbers.', ok: false }); return; }
     if (row.website && !/^https:\/\//i.test(row.website)) { setMsg({ text: 'The website must start with https://', ok: false }); return; }
     if (row.slug !== orig && pages.some((p) => p.slug === row.slug)) { setMsg({ text: `povgo/p/${row.slug} already exists.`, ok: false }); return; }
@@ -198,6 +201,10 @@ export default function AdminBusinesses({ videos }: { videos: PublicVideo[] }) {
           </label>
         </div>
       </div>
+
+      <BusinessBackground slug={normKey(edit.slug)} name={edit.name} bgUrl={edit.bg_url} bgTone={edit.bg_tone}
+        onUse={(url, tone) => setEdit((e) => (e ? { ...e, bg_url: url, bg_tone: tone } : e))}
+        onClear={() => setEdit((e) => (e ? { ...e, bg_url: '', bg_tone: 'light' } : e))} />
 
       <div className="card p-5">
         <h3 className="text-lg font-semibold">Creator videos ({matched.length})</h3>

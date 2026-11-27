@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { getSupabase, supabaseConfigured } from '@/lib/supabase';
 import { categoryColor } from '@/lib/types';
-import { fetchBusinessVideos, type BusinessInfo } from '@/lib/business';
+import { fetchBusinessVideos, scrimFor, type BusinessInfo } from '@/lib/business';
 import type { MapPin } from '@/components/Map';
 import type { PublicVideo } from '@/components/PublicMap';
 import PosterTile from '@/components/PosterTile';
@@ -126,6 +126,18 @@ export default function BusinessPage({ slug }: { slug: string }) {
   }
 
   const loading = videos === null;
+  // Admin-chosen background: the text switches to light on dark images, and a wash keeps everything readable.
+  const bg = info?.bg_url || '';
+  const dark = Boolean(bg) && info?.bg_tone === 'dark';
+  const tc = {
+    eyebrow: dark ? 'text-[#9fe0ff]' : 'text-glacier',
+    h: dark ? 'text-white' : '',
+    meta: dark ? 'text-white/80' : 'text-gray-500',
+    body: dark ? 'text-white/90' : 'text-gray-700',
+    link: dark ? 'text-[#bfeaff]' : 'text-glacier',
+    soft: dark ? 'text-white/60' : 'text-gray-400',
+    name: dark ? 'text-white/85' : 'text-gray-600',
+  };
   const meta = [category && catLabel(category), cityOf(address),
     !loading ? `${videos.length} video${videos.length === 1 ? '' : 's'} · ${creators.length} creator${creators.length === 1 ? '' : 's'}` : null,
   ].filter(Boolean).join(' · ');
@@ -133,18 +145,24 @@ export default function BusinessPage({ slug }: { slug: string }) {
   return (
     <>
       <SiteNav compact />
-      <main className="flex-1 bg-cloud text-ink">
+      <main className={`relative isolate flex-1 ${bg ? '' : 'bg-cloud'} ${dark ? `text-white [text-shadow:0_1px_6px_rgba(0,0,0,.25)]` : 'text-ink'}`}>
+        {bg && (
+          <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center"
+            style={{ backgroundImage: `url("${bg}")` }}>
+            <div className="absolute inset-0" style={{ background: scrimFor(dark ? 'dark' : 'light') }} />
+          </div>
+        )}
         <div className="max-w-5xl mx-auto px-4 pb-28">
           {/* Who */}
           <header className="pt-5 pb-4">
-            <p className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-glacier">Every creator&apos;s POV</p>
+            <p className={`text-[11px] sm:text-xs font-extrabold uppercase tracking-wider ${tc.eyebrow}`}>Every creator&apos;s POV</p>
             <h1 className="mt-1 font-display text-3xl sm:text-5xl font-semibold leading-[1.05] break-words">
               {loading ? <span className="inline-block h-9 w-48 rounded bg-white animate-pulse" /> : name}
             </h1>
-            <p className="mt-1.5 text-xs sm:text-sm font-bold text-gray-500">{meta || <>&nbsp;</>}</p>
-            {info?.bio && <p className="mt-3 text-sm sm:text-base font-bold text-gray-700 whitespace-pre-line break-words">{info.bio}</p>}
+            <p className={`mt-1.5 text-xs sm:text-sm font-bold ${tc.meta}`}>{meta || <>&nbsp;</>}</p>
+            {info?.bio && <p className={`mt-3 text-sm sm:text-base font-bold whitespace-pre-line break-words ${tc.body}`}>{info.bio}</p>}
             {address && (
-              <a href={directions ?? '#'} target="_blank" rel="noopener" className="mt-2 inline-block text-sm font-bold text-glacier hover:underline">
+              <a href={directions ?? '#'} target="_blank" rel="noopener" className={`mt-2 inline-block text-sm font-bold hover:underline ${tc.link}`}>
                 📍 {address}
               </a>
             )}
@@ -198,14 +216,14 @@ export default function BusinessPage({ slug }: { slug: string }) {
           {/* Every video, side to side */}
           {!loading && videos.length > 0 && (
             <section aria-labelledby="povs" className="mt-6">
-              <h2 id="povs" className="text-xl sm:text-2xl font-semibold mb-3">All the POVs <span className="text-gray-400 text-base">({videos.length})</span></h2>
+              <h2 id="povs" className="text-xl sm:text-2xl font-semibold mb-3">All the POVs <span className={`${tc.soft} text-base`}>({videos.length})</span></h2>
               <div role="region" aria-label="All creator videos" tabIndex={0}
                 className="-mx-4 px-4 flex gap-2 sm:gap-4 overflow-x-auto snap-x snap-mandatory pb-2 focus-visible:outline-2 focus-visible:outline-ice">
                 {videos.map((v) => (
                   <div key={v.id} className="snap-start shrink-0 w-[38%] sm:w-[23%]"><PosterTile video={v} /></div>
                 ))}
               </div>
-              <p className="mt-1 text-xs font-bold text-gray-500">Posted by creators, newest first. Businesses can&apos;t edit or hide these.</p>
+              <p className={`mt-1 text-xs font-bold ${tc.meta}`}>Posted by creators, newest first. Businesses can&apos;t edit or hide these.</p>
             </section>
           )}
 
@@ -225,8 +243,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
                             className="absolute inset-0 w-full h-full object-cover" />
                         )}
                       </span>
-                      <span className="w-full truncate text-center text-[11px] font-bold text-gray-600">@{c.handle}</span>
-                      <span className="text-[10px] font-bold text-gray-400">{c.count} video{c.count === 1 ? '' : 's'}</span>
+                      <span className={`w-full truncate text-center text-[11px] font-bold ${tc.name}`}>@{c.handle}</span>
+                      <span className={`text-[10px] font-bold ${tc.soft}`}>{c.count} video{c.count === 1 ? '' : 's'}</span>
                     </Link>
                   </li>
                 ))}
