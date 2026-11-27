@@ -12,6 +12,10 @@ export interface BusinessInfo {
   address: string;
   website: string;
   top_video_ids: string[];
+  /** Background image for the page (needs supabase/business-backgrounds.sql). */
+  bg_url?: string;
+  /** 'dark' = the image is dark, so the page uses light text. */
+  bg_tone?: 'light' | 'dark';
   created_at?: string;
   updated_at?: string;
 }
@@ -31,3 +35,6 @@ export async function fetchBusinessVideos(sb: SupabaseClient, key: string): Prom
     .order('posted_at', { ascending: false, nullsFirst: false }).limit(300);
   return ((data ?? []) as unknown as PublicVideo[]).filter((v) => matchesKey(v, key));
 }
+
+/** Wash laid over a page background so text stays readable: pale for light images, deep for dark images. */
+export const scrimFor = (tone: 'light' | 'dark') => (tone === 'dark' ? 'rgba(12,28,42,.5)' : 'rgba(244,251,254,.55)');
